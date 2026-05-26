@@ -1,0 +1,16 @@
+# Secrets
+data/.env
+
+# Generated vector store (run: python generate_data.py)
+data/chroma_db/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.env
+
+# IDE / local
+.claude/
+.DS_Store
