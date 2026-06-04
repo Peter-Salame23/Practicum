@@ -69,13 +69,6 @@ RISK_BG     = {
 # GLOBAL STYLES
 # ─────────────────────────────────────────────────────────────────────────────
 
-# Inject Google Fonts via link tag (more reliable than @import inside <style>)
-st.markdown(
-    '<link rel="preconnect" href="https://fonts.googleapis.com">'
-    '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>'
-    '<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">',
-    unsafe_allow_html=True,
-)
 # ─────────────────────────────────────────────────────────────────────────────
 # DESIGN TOKENS
 # ─────────────────────────────────────────────────────────────────────────────
@@ -359,9 +352,28 @@ div[data-testid="stPlotlyChart"] .plot-container {{
   background: {SURFACE} !important;
 }}
 
-/* ── FORCE INTER ON EVERYTHING ──────────────────────────────── */
-input, select, textarea, button, label, p, span, div, h1, h2, h3, h4, h5 {{
+/* ── FORCE INTER — exclude Material Icons spans so chat avatars render ── */
+input, select, textarea, button, label, p,
+div, h1, h2, h3, h4, h5 {{
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important;
+}}
+span:not(.material-icons):not(.material-symbols-rounded):not(.material-symbols-outlined) {{
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important;
+}}
+
+/* ── CHAT MESSAGES ───────────────────────────────────────────── */
+[data-testid="stChatMessage"] {{
+  background: {SURFACE} !important;
+  border: 1px solid {BORDER} !important;
+  border-radius: 14px !important;
+  padding: 0.85rem 1.1rem !important;
+  margin-bottom: 0.6rem !important;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04) !important;
+}}
+[data-testid="stChatMessage"] p {{
+  font-size: 0.9rem !important;
+  line-height: 1.6 !important;
+  color: {DARK} !important;
 }}
 
 /* ── FORCE LIGHT INPUTS IN MAIN CONTENT ─────────────────────── */
@@ -4003,8 +4015,8 @@ elif view == "Forecasting":
 
 elif view == "AI Assistant":
     page_header(
-        "AI Lending Assistant",
-        "Ask anything about clients, risk, or loan eligibility",
+        "AI Assistant",
+        "Ask about clients by segment, goal, or engagement — vault records resolved automatically",
     )
 
     if not OPENROUTER_KEY:
@@ -4024,14 +4036,14 @@ elif view == "AI Assistant":
         unsafe_allow_html=True,
     )
     prompts = [
-        f"Is {sel['name']} eligible for a $30,000 personal loan?",
-        "Which clients have the highest default risk?",
-        "List clients with credit scores over 750 and low debt.",
-        "Who has the worst debt-to-income ratio?",
+        "Which clients are one step away from primacy?",
+        "Find near-primacy clients missing payroll deposit.",
+        "Who has digital engagement but is still non-primacy?",
+        "Find clients working toward a retirement goal.",
     ]
     q1, q2, q3, q4 = st.columns(4)
     for col, prompt in zip([q1, q2, q3, q4], prompts):
-        if col.button(prompt[:42] + "…", key=f"qp_{prompt[:20]}", use_container_width=True):
+        if col.button(prompt, key=f"qp_{prompt[:20]}", use_container_width=True):
             st.session_state.pending_q = prompt
 
     st.markdown("<div style='height:4px'></div>", unsafe_allow_html=True)
@@ -4128,7 +4140,8 @@ elif view == "AI Assistant":
 
     # Chat history
     for msg in st.session_state.chat:
-        with st.chat_message(msg["role"]):
+        avatar = "👤" if msg["role"] == "user" else "🤖"
+        with st.chat_message(msg["role"], avatar=avatar):
             if msg["role"] == "assistant":
                 render_vault_tokens(msg["content"])
             else:
@@ -4139,9 +4152,9 @@ elif view == "AI Assistant":
         question = st.session_state.pending_q
         st.session_state.pending_q = None
         st.session_state.chat.append({"role": "user", "content": question})
-        with st.chat_message("user"):
+        with st.chat_message("user", avatar="👤"):
             st.markdown(question)
-        with st.chat_message("assistant"):
+        with st.chat_message("assistant", avatar="🤖"):
             answer = ask_vault(question)
             render_vault_tokens(answer)
         st.session_state.chat.append({"role": "assistant", "content": answer})
@@ -4150,14 +4163,14 @@ elif view == "AI Assistant":
     user_input = st.chat_input("Ask about any client, segment, or engagement strategy…")
     if user_input:
         st.session_state.chat.append({"role": "user", "content": user_input})
-        with st.chat_message("user"):
+        with st.chat_message("user", avatar="👤"):
             st.markdown(user_input)
-        with st.chat_message("assistant"):
+        with st.chat_message("assistant", avatar="🤖"):
             answer = ask_vault(user_input)
             render_vault_tokens(answer)
         st.session_state.chat.append({"role": "assistant", "content": answer})
 
     if st.session_state.chat:
-        if st.button("Clear conversation"):
+        if st.button("🗑️ Clear conversation", type="secondary"):
             st.session_state.chat = []
             st.rerun()
