@@ -4064,7 +4064,8 @@ elif view == "AI Assistant":
 
     def render_customer_card(token: str) -> None:
         """Resolve a vault token and render a customer card using native Streamlit
-        components — no raw HTML injection so special characters never break rendering."""
+        components — no raw HTML injection so special characters never break rendering.
+        Cross-references cust_index for derived fields (credit score, risk tier)."""
         record = vault.resolve(token)
         if record is None:
             return
@@ -4079,6 +4080,13 @@ elif view == "AI Assistant":
         digital = bool(record.get("digital_engagement_flag_30days"))
         income  = record.get("annual_income")
         income_str = f"${float(income):,.0f}" if income else "—"
+
+        # Pull derived fields from customers.json via cust_index
+        cust_id    = str(record.get("customer_id") or "")
+        derived    = cust_index.get(cust_id, {})
+        credit     = derived.get("credit_score")
+        risk_tier  = derived.get("risk_tier", "—")
+        credit_str = str(credit) if credit else "—"
 
         products = [label for field, label in [
             ("has_open_chequing",        "Chequing"),
@@ -4104,13 +4112,14 @@ elif view == "AI Assistant":
                 unsafe_allow_html=True,
             )
 
-            c1, c2, c3, c4 = st.columns(4)
+            c1, c2, c3, c4, c5 = st.columns(5)
             c1.metric("Income", income_str)
-            c2.metric("Steps to Primacy", steps)
-            c3.metric("Advisor", advisor)
-            c4.metric("Goal", goal, delta=goal_st, delta_color="off")
+            c2.metric("Credit Score", credit_str)
+            c3.metric("Risk", risk_tier)
+            c4.metric("Steps to Primacy", steps)
+            c5.metric("Advisor", advisor)
 
-            st.caption(f"**Missing:** {missing}  ·  **Products:** {', '.join(products) or 'none'}")
+            st.caption(f"**Goal:** {goal} ({goal_st})  ·  **Missing:** {missing}  ·  **Products:** {', '.join(products) or 'none'}")
 
     def render_vault_section(tokens: list[str]) -> None:
         """Render vault cards OUTSIDE the chat bubble so page styles apply correctly."""

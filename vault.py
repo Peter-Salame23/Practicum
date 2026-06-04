@@ -214,17 +214,33 @@ def search_tokens(query: str) -> list[str]:
 
 
 def search_by_name(query: str) -> list[str]:
-    """Case-insensitive partial name match. Returns matching tokens."""
+    """Name search with priority tiers so 'Aaliyah Charles' finds Aaliyah Charles
+    specifically rather than flooding results with every Charles.
+
+    Tier 1 — exact full-name match (returns immediately if found)
+    Tier 2 — ALL words in query appear in the name  (e.g. both 'Aaliyah' AND 'Charles')
+    Tier 3 — first name only match (fallback, capped at 5)
+    """
     q = query.strip().lower()
     if not q:
         return []
-    results = []
+    words = [w for w in q.split() if len(w) > 1]
+
+    exact, all_words, first_only = [], [], []
     for token, row in _vault.items():
         name = str(row.get("customer_name", "")).lower()
-        # Match if full query OR any meaningful word matches
-        if q in name or any(w in name for w in q.split() if len(w) > 2):
-            results.append(token)
-    return results
+        if name == q:
+            exact.append(token)
+        elif all(w in name for w in words):
+            all_words.append(token)
+        elif words and words[0] in name:
+            first_only.append(token)
+
+    if exact:
+        return exact
+    if all_words:
+        return all_words
+    return first_only[:5]
 
 
 def search_by_keyword(question: str, n: int = 8) -> list[str]:
