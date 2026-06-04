@@ -1,21 +1,21 @@
 """
-Scotiabank RAG Lending Intelligence Platform
-Streamlit + ChromaDB + OpenRouter
+Scotiabank Lending Intelligence Platform
+Streamlit + Vault + OpenRouter
 """
 
 import json
 import os
+import re
 from datetime import datetime, timedelta
 
 from dotenv import load_dotenv
 from openai import OpenAI
-import chromadb
 import numpy as np
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 import streamlit as st
-from chromadb.utils.embedding_functions import SentenceTransformerEmbeddingFunction
+import vault
 
 load_dotenv("data/.env")
 OPENROUTER_KEY = os.environ.get("OpenrouterApiKey", "").strip().strip("'\"")
@@ -378,14 +378,17 @@ def load_customers():
     with open("data/customers.json") as f:
         return json.load(f)
 
+_VAULT_CSV = "MMA - Practicum Synthetic Data(Synethic_Data).csv"
+
 @st.cache_resource
-def get_chroma():
-    client = chromadb.PersistentClient(path="data/chroma_db")
-    ef = SentenceTransformerEmbeddingFunction(model_name="all-MiniLM-L6-v2")
-    return client.get_collection("bank_customers", embedding_function=ef)
+def load_vault():
+    if os.path.exists(_VAULT_CSV):
+        vault.load(_VAULT_CSV)
+    else:
+        st.warning(f"Vault CSV not found: {_VAULT_CSV}")
 
 customers  = load_customers()
-collection = get_chroma()
+load_vault()
 cust_index = {c["id"]: c for c in customers}
 
 df = pd.DataFrame([{
@@ -664,28 +667,43 @@ def ai_chat(system: str, user: str, model: str = OR_MODEL, max_tokens: int = 150
 # RAG HELPERS
 # ─────────────────────────────────────────────────────────────────────────────
 
-def rag_query(question: str, n: int = 5):
-    try:
-        results = collection.query(query_texts=[question], n_results=n)
-        docs    = results["documents"][0]
-        ids     = results["ids"][0]
-    except Exception as e:
-        return f"⚠️ Vector DB error: {e}", []
+def vault_query(question: str, n: int = 8):
+    """Search vault for relevant customers using keyword matching on agent summaries.
+    Agents only see vault tokens + non-sensitive fields; no financial data in context."""
+    if not vault.is_loaded():
+        return "⚠️ Vault not loaded.", []
 
-    context  = "\n\n---\n\n".join(docs)
-    system   = (
-        "You are a senior lending officer at Scotiabank with expertise in credit risk "
-        "and financial analysis. You have customer profiles retrieved from the database. "
-        "Respond professionally, cite specific numbers, flag risk factors clearly. "
-        "For loan eligibility be direct: APPROVED / CONDITIONALLY APPROVED / DECLINED."
+    q_lower = question.lower()
+    tokens  = vault.all_tokens()
+
+    # Score each token by how many question words appear in its summary text
+    scored = []
+    for t in tokens:
+        summary = vault.agent_summary_text(t)
+        hits = sum(1 for word in q_lower.split() if len(word) > 3 and word in summary.lower())
+        scored.append((hits, t))
+
+    scored.sort(key=lambda x: -x[0])
+    top_tokens = [t for _, t in scored[:n]]
+
+    # Build context from agent-safe summaries only
+    context = "\n\n---\n\n".join(vault.agent_summary_text(t) for t in top_tokens)
+
+    system = (
+        "You are a senior banking advisor at Scotiabank specialising in primacy and "
+        "client engagement strategy. You have been given anonymized customer summaries "
+        "retrieved from a secure vault. Each customer is identified only by their vault "
+        "token (e.g. 'barbara-1'). When referencing a specific customer, always write "
+        "their token in the format [VAULT:token] so the system can resolve it. "
+        "Never invent financial figures — only use what is in the summaries provided. "
+        "Be direct and professional."
     )
-    user_msg = f"Customer profiles:\n\n{context}\n\nQuestion: {question}"
+    user_msg = f"Customer summaries:\n\n{context}\n\nQuestion: {question}"
 
     with st.spinner("Analysing..."):
         text = ai_chat(system, user_msg, model=OR_FAST_MODEL, max_tokens=1500)
 
-    matched = [cust_index[i] for i in ids if i in cust_index]
-    return text, matched
+    return text, top_tokens
 
 
 def loan_assessment(customer, amount, loan_type, term):
@@ -1607,8 +1625,8 @@ elif view == "Forecasting":
 
 elif view == "AI Assistant":
     page_header(
-        "AI Lending Assistant",
-        "Ask anything about clients, risk, or loan eligibility",
+        "AI Vault Assistant",
+        "Ask about clients by segment, engagement, or goal — vault tokens resolved automatically",
     )
 
     if not OPENROUTER_KEY:
@@ -1628,10 +1646,10 @@ elif view == "AI Assistant":
         unsafe_allow_html=True,
     )
     prompts = [
-        f"Is {sel['name']} eligible for a $30,000 personal loan?",
-        "Which clients have the highest default risk?",
-        "List clients with credit scores over 750 and low debt.",
-        "Who has the worst debt-to-income ratio?",
+        "Which clients are one step away from primacy?",
+        "Who has digital engagement but is still non-primacy?",
+        "Find clients working toward a retirement goal.",
+        "Which near-primacy clients are missing payroll deposit?",
     ]
     q1, q2, q3, q4 = st.columns(4)
     for col, prompt in zip([q1, q2, q3, q4], prompts):
@@ -1641,27 +1659,105 @@ elif view == "AI Assistant":
     st.markdown("<div style='height:4px'></div>", unsafe_allow_html=True)
     st.divider()
 
-    def ask_rag(question: str) -> str:
-        try:
-            results = collection.query(query_texts=[question], n_results=5)
-            docs    = results["documents"][0]
-            context = "\n\n---\n\n".join(docs)
-        except Exception as e:
-            return f"⚠️ Database error: {e}"
-        system_msg = (
-            "You are a senior lending officer at Scotiabank with expertise in credit risk. "
-            "Answer based on the customer profiles below. Be direct, cite specific numbers, "
-            "and flag risk factors clearly. For loan eligibility give a clear APPROVED / "
-            "CONDITIONALLY APPROVED / DECLINED verdict."
+    def render_vault_tokens(agent_text: str) -> None:
+        """Parse [VAULT:token] markers in agent output, display resolved data to user."""
+        token_pattern = re.compile(r"\[VAULT:([\w-]+)\]")
+        found_tokens  = token_pattern.findall(agent_text)
+
+        # Show agent text with tokens rendered as inline badges
+        display_text = token_pattern.sub(
+            lambda m: f"`{m.group(1)}`",
+            agent_text,
         )
-        return ai_chat(system_msg,
-                       f"Customer profiles:\n\n{context}\n\nQuestion: {question}",
-                       model=OR_FAST_MODEL)
+        st.markdown(display_text)
+
+        # Resolve each referenced token and show full data directly to the user
+        if found_tokens:
+            st.markdown(
+                f"<div style='font-size:0.72rem;font-weight:700;text-transform:uppercase;"
+                f"letter-spacing:0.07em;color:{MUTED};margin-top:1rem;margin-bottom:0.4rem'>"
+                f"Vault records resolved for you</div>",
+                unsafe_allow_html=True,
+            )
+            for token in dict.fromkeys(found_tokens):   # deduplicate, preserve order
+                record = vault.resolve(token)
+                if record is None:
+                    st.warning(f"Token not found in vault: {token}")
+                    continue
+                name = record.get("customer_name", token)
+                seg  = record.get("primary_segment", "—")
+                steps = record.get("primacy_steps_away", "—")
+                missing = record.get("missing_primacy_steps", "none")
+                advisor = record.get("note_advisor_name", "—")
+                goal    = record.get("goal_purpose", "—")
+                goal_st = record.get("completion_status", "—")
+                income  = record.get("annual_income")
+                income_str = f"${income:,.0f}" if income else "—"
+
+                products = []
+                for field, label in [
+                    ("has_open_chequing",        "Chequing"),
+                    ("has_open_savings",         "Savings"),
+                    ("has_open_registered_retirement_savings_account", "RRSP"),
+                    ("has_open_registered_retirement_income_fund_account", "RRIF"),
+                    ("has_open_registered_first_home_savings_account",    "FHSA"),
+                    ("has_open_registered_disability_savings_account",    "RDSP"),
+                    ("has_open_registered_education_savings_account",     "RESP"),
+                    ("has_advice_plus_plan",     "Advice+"),
+                    ("has_smart_investor_plan",  "Smart Investor"),
+                ]:
+                    if record.get(field):
+                        products.append(label)
+
+                seg_color = {
+                    "Primacy": SUCCESS, "Near Primacy": WARNING, "Non-Primacy": DANGER
+                }.get(seg, MUTED)
+
+                st.markdown(
+                    f"""<div style='background:{SURFACE};border:1px solid {BORDER};
+                            border-radius:14px;padding:1rem 1.25rem;margin-bottom:0.75rem;
+                            border-left:4px solid {seg_color}'>
+                      <div style='display:flex;justify-content:space-between;align-items:center;
+                                  margin-bottom:0.6rem'>
+                        <div>
+                          <span style='font-weight:700;font-size:0.95rem;color:{DARK}'>{name}</span>
+                          <span style='font-size:0.7rem;color:{MUTED};margin-left:8px'>
+                            vault: <code>{token}</code></span>
+                        </div>
+                        <span style='background:{seg_color}18;color:{seg_color};font-size:0.65rem;
+                                     font-weight:700;padding:2px 10px;border-radius:20px;
+                                     border:1px solid {seg_color}30'>{seg}</span>
+                      </div>
+                      <div style='display:grid;grid-template-columns:repeat(4,1fr);gap:8px;
+                                  font-size:0.75rem'>
+                        <div><span style='color:{MUTED}'>Annual income</span><br>
+                             <b>{income_str}</b></div>
+                        <div><span style='color:{MUTED}'>Steps to primacy</span><br>
+                             <b>{steps}</b></div>
+                        <div><span style='color:{MUTED}'>Advisor</span><br>
+                             <b>{advisor}</b></div>
+                        <div><span style='color:{MUTED}'>Goal</span><br>
+                             <b>{goal} ({goal_st})</b></div>
+                      </div>
+                      <div style='margin-top:0.6rem;font-size:0.72rem;color:{MUTED}'>
+                        <b>Missing steps:</b> {missing or "none"} &nbsp;·&nbsp;
+                        <b>Products:</b> {', '.join(products) or 'none'}
+                      </div>
+                    </div>""",
+                    unsafe_allow_html=True,
+                )
+
+    def ask_vault(question: str) -> str:
+        answer, _ = vault_query(question)
+        return answer
 
     # Chat history
     for msg in st.session_state.chat:
         with st.chat_message(msg["role"]):
-            st.markdown(msg["content"])
+            if msg["role"] == "assistant":
+                render_vault_tokens(msg["content"])
+            else:
+                st.markdown(msg["content"])
 
     # Quick prompt trigger
     if st.session_state.pending_q:
@@ -1671,21 +1767,19 @@ elif view == "AI Assistant":
         with st.chat_message("user"):
             st.markdown(question)
         with st.chat_message("assistant"):
-            with st.spinner("Analysing..."):
-                answer = ask_rag(question)
-            st.markdown(answer)
+            answer = ask_vault(question)
+            render_vault_tokens(answer)
         st.session_state.chat.append({"role": "assistant", "content": answer})
 
     # Typed input
-    user_input = st.chat_input("Ask about any client, loan, or risk…")
+    user_input = st.chat_input("Ask about any client, segment, or engagement strategy…")
     if user_input:
         st.session_state.chat.append({"role": "user", "content": user_input})
         with st.chat_message("user"):
             st.markdown(user_input)
         with st.chat_message("assistant"):
-            with st.spinner("Analysing..."):
-                answer = ask_rag(user_input)
-            st.markdown(answer)
+            answer = ask_vault(user_input)
+            render_vault_tokens(answer)
         st.session_state.chat.append({"role": "assistant", "content": answer})
 
     if st.session_state.chat:
