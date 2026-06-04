@@ -4063,20 +4063,22 @@ elif view == "AI Assistant":
     st.divider()
 
     def render_customer_card(token: str) -> None:
-        """Resolve a vault token and render the full customer card to the user."""
+        """Resolve a vault token and render a customer card using native Streamlit
+        components — no raw HTML injection so special characters never break rendering."""
         record = vault.resolve(token)
         if record is None:
             return
-        name    = record.get("customer_name", token)
-        seg     = record.get("primary_segment", "—")
+
+        name    = str(record.get("customer_name") or token)
+        seg     = str(record.get("primary_segment") or "—")
         steps   = record.get("primacy_steps_away", "—")
-        missing = record.get("missing_primacy_steps") or "none"
-        advisor = record.get("note_advisor_name", "—")
-        goal    = record.get("goal_purpose", "—")
-        goal_st = record.get("completion_status", "—")
-        digital = record.get("digital_engagement_flag_30days", False)
+        missing = str(record.get("missing_primacy_steps") or "none")
+        advisor = str(record.get("note_advisor_name") or "—")
+        goal    = str(record.get("goal_purpose") or "—")
+        goal_st = str(record.get("completion_status") or "—")
+        digital = bool(record.get("digital_engagement_flag_30days"))
         income  = record.get("annual_income")
-        income_str = f"${income:,.0f}" if income else "—"
+        income_str = f"${float(income):,.0f}" if income else "—"
 
         products = [label for field, label in [
             ("has_open_chequing",        "Chequing"),
@@ -4090,53 +4092,25 @@ elif view == "AI Assistant":
             ("has_smart_investor_plan",  "Smart Investor"),
         ] if record.get(field)]
 
-        seg_color = {"Primacy": SUCCESS, "Near Primacy": WARNING, "Non-Primacy": DANGER}.get(seg, MUTED)
-        dig_badge = (f"<span style='background:{SUCCESS}18;color:{SUCCESS};font-size:0.62rem;"
-                     f"font-weight:700;padding:1px 7px;border-radius:10px;border:1px solid {SUCCESS}30;"
-                     f"margin-left:6px'>Digital</span>" if digital else "")
+        seg_icon = {"Primacy": "🟢", "Near Primacy": "🟡", "Non-Primacy": "🔴"}.get(seg, "⚪")
+        dig_tag  = " · 📱 Digital" if digital else ""
 
-        st.markdown(
-            f"""<div style='background:{SURFACE};border:1px solid {BORDER};border-radius:14px;
-                    padding:1rem 1.25rem;margin-bottom:0.6rem;border-left:4px solid {seg_color};
-                    box-shadow:0 1px 4px rgba(0,0,0,0.05)'>
-              <div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:0.75rem'>
-                <div style='display:flex;align-items:center;gap:6px'>
-                  <span style='font-weight:700;font-size:1rem;color:{DARK}'>{name}</span>
-                  {dig_badge}
-                </div>
-                <span style='background:{seg_color}18;color:{seg_color};font-size:0.65rem;font-weight:700;
-                             padding:3px 10px;border-radius:20px;border:1px solid {seg_color}30'>{seg}</span>
-              </div>
-              <div style='display:grid;grid-template-columns:repeat(4,1fr);gap:10px;font-size:0.78rem;margin-bottom:0.6rem'>
-                <div style='background:{BG};border-radius:8px;padding:8px 10px'>
-                  <div style='color:{MUTED};font-size:0.65rem;text-transform:uppercase;
-                              letter-spacing:0.06em;margin-bottom:2px'>Annual Income</div>
-                  <div style='font-weight:700;color:{DARK}'>{income_str}</div>
-                </div>
-                <div style='background:{BG};border-radius:8px;padding:8px 10px'>
-                  <div style='color:{MUTED};font-size:0.65rem;text-transform:uppercase;
-                              letter-spacing:0.06em;margin-bottom:2px'>Primacy Steps</div>
-                  <div style='font-weight:700;color:{DARK}'>{steps} away</div>
-                </div>
-                <div style='background:{BG};border-radius:8px;padding:8px 10px'>
-                  <div style='color:{MUTED};font-size:0.65rem;text-transform:uppercase;
-                              letter-spacing:0.06em;margin-bottom:2px'>Advisor</div>
-                  <div style='font-weight:700;color:{DARK}'>{advisor}</div>
-                </div>
-                <div style='background:{BG};border-radius:8px;padding:8px 10px'>
-                  <div style='color:{MUTED};font-size:0.65rem;text-transform:uppercase;
-                              letter-spacing:0.06em;margin-bottom:2px'>Goal</div>
-                  <div style='font-weight:700;color:{DARK}'>{goal}</div>
-                  <div style='font-size:0.65rem;color:{MUTED}'>{goal_st}</div>
-                </div>
-              </div>
-              <div style='font-size:0.72rem;color:{MUTED};border-top:1px solid {BORDER};padding-top:0.5rem;margin-top:0.25rem'>
-                <b style='color:{DARK}'>Missing steps:</b> {missing} &nbsp;·&nbsp;
-                <b style='color:{DARK}'>Products:</b> {', '.join(products) or 'none'}
-              </div>
-            </div>""",
-            unsafe_allow_html=True,
-        )
+        with st.container(border=True):
+            h_left, h_right = st.columns([3, 1])
+            h_left.markdown(f"**{name}**{dig_tag}")
+            h_right.markdown(
+                f"<div style='text-align:right;font-size:0.8rem;font-weight:700'>"
+                f"{seg_icon} {seg}</div>",
+                unsafe_allow_html=True,
+            )
+
+            c1, c2, c3, c4 = st.columns(4)
+            c1.metric("Income", income_str)
+            c2.metric("Steps to Primacy", steps)
+            c3.metric("Advisor", advisor)
+            c4.metric("Goal", goal, delta=goal_st, delta_color="off")
+
+            st.caption(f"**Missing:** {missing}  ·  **Products:** {', '.join(products) or 'none'}")
 
     def render_vault_section(tokens: list[str]) -> None:
         """Render vault cards OUTSIDE the chat bubble so page styles apply correctly."""
