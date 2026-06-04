@@ -4138,65 +4138,75 @@ elif view == "AI Assistant":
             unsafe_allow_html=True,
         )
 
-    def render_assistant_message(msg: dict) -> None:
-        """Render a stored assistant message: cards first, then analysis."""
-        tokens  = msg.get("vault_tokens", [])
-        content = msg.get("content", "")
-        if tokens:
-            st.markdown(
-                f"<div style='font-size:0.68rem;font-weight:700;text-transform:uppercase;"
-                f"letter-spacing:0.07em;color:{MUTED};margin-bottom:0.5rem'>"
-                f"Vault records · {len(tokens)} found</div>",
-                unsafe_allow_html=True,
-            )
+    def render_vault_section(tokens: list[str]) -> None:
+        """Render vault cards OUTSIDE the chat bubble so page styles apply correctly."""
+        if not tokens:
+            return
+        st.markdown(
+            f"<div style='font-size:0.68rem;font-weight:700;text-transform:uppercase;"
+            f"letter-spacing:0.08em;color:{MUTED};margin:0.6rem 0 0.5rem 3.2rem'>"
+            f"Vault records · {len(tokens)} found</div>",
+            unsafe_allow_html=True,
+        )
+        with st.container():
             for t in tokens:
                 render_customer_card(t)
-            if content:
+
+    def replay_message(msg: dict) -> None:
+        """Re-render a single turn from history (cards outside bubble, text inside)."""
+        if msg["role"] == "user":
+            with st.chat_message("user", avatar="👤"):
+                st.markdown(msg["content"])
+        else:
+            tokens = msg.get("vault_tokens", [])
+            render_vault_section(tokens)
+            with st.chat_message("assistant", avatar="🤖"):
+                if tokens:
+                    st.markdown(
+                        f"<div style='font-size:0.68rem;font-weight:600;color:{MUTED};"
+                        f"margin-bottom:0.4rem'>Analysis</div>",
+                        unsafe_allow_html=True,
+                    )
+                st.markdown(msg["content"])
+
+    def handle_question(question: str) -> None:
+        """Run vault query, display results, append to history."""
+        st.session_state.chat.append({"role": "user", "content": question})
+        with st.chat_message("user", avatar="👤"):
+            st.markdown(question)
+
+        answer, tokens = vault_query(question)
+
+        # Cards rendered directly in the page — NOT inside the chat bubble
+        render_vault_section(tokens)
+
+        with st.chat_message("assistant", avatar="🤖"):
+            if tokens:
                 st.markdown(
-                    f"<div style='font-size:0.68rem;font-weight:700;text-transform:uppercase;"
-                    f"letter-spacing:0.07em;color:{MUTED};margin-top:0.8rem;margin-bottom:0.4rem'>"
-                    f"Analysis</div>",
+                    f"<div style='font-size:0.68rem;font-weight:600;color:{MUTED};"
+                    f"margin-bottom:0.4rem'>Analysis</div>",
                     unsafe_allow_html=True,
                 )
-        if content:
-            st.markdown(content)
+            st.markdown(answer)
 
-    def run_vault_query(question: str) -> dict:
-        """Execute query, render cards immediately, return message dict for history."""
-        answer, tokens = vault_query(question)
-        return {"role": "assistant", "content": answer, "vault_tokens": tokens}
+        st.session_state.chat.append({
+            "role": "assistant", "content": answer, "vault_tokens": tokens
+        })
 
-    # Chat history
+    # Replay chat history
     for msg in st.session_state.chat:
-        avatar = "👤" if msg["role"] == "user" else "🤖"
-        with st.chat_message(msg["role"], avatar=avatar):
-            if msg["role"] == "assistant":
-                render_assistant_message(msg)
-            else:
-                st.markdown(msg["content"])
+        replay_message(msg)
 
     # Quick prompt trigger
     if st.session_state.pending_q:
         question = st.session_state.pending_q
         st.session_state.pending_q = None
-        st.session_state.chat.append({"role": "user", "content": question})
-        with st.chat_message("user", avatar="👤"):
-            st.markdown(question)
-        with st.chat_message("assistant", avatar="🤖"):
-            result = run_vault_query(question)
-            render_assistant_message(result)
-        st.session_state.chat.append(result)
+        handle_question(question)
 
     # Typed input
     user_input = st.chat_input("Ask about any client, segment, or engagement strategy…")
     if user_input:
-        st.session_state.chat.append({"role": "user", "content": user_input})
-        with st.chat_message("user", avatar="👤"):
-            st.markdown(user_input)
-        with st.chat_message("assistant", avatar="🤖"):
-            result = run_vault_query(user_input)
-            render_assistant_message(result)
-        st.session_state.chat.append(result)
+        handle_question(user_input)
 
     if st.session_state.chat:
         if st.button("🗑️ Clear conversation", type="secondary"):
