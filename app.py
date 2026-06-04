@@ -7,6 +7,7 @@ Streamlit + ChromaDB + OpenRouter
 import json
 import os
 import re
+import hashlib
 from html import escape
 from datetime import datetime, date, timedelta
 
@@ -24,6 +25,12 @@ load_dotenv("data/.env")
 OPENROUTER_KEY = os.environ.get("OpenrouterApiKey", "").strip().strip("'\"")
 CUSTOMERS_JSON_PATH = os.environ.get("CustomersJsonPath", "data/customers.json").strip().strip("'\"")
 CHROMA_DB_PATH = os.environ.get("ChromaDbPath", "data/chroma_db").strip().strip("'\"")
+
+
+def stable_seed_from_customer_id(customer_id):
+    customer_id = str(customer_id or "0")
+    digest = hashlib.md5(customer_id.encode("utf-8")).hexdigest()
+    return int(digest[:8], 16)
 
 # ─────────────────────────────────────────────────────────────────────────────
 # PAGE CONFIG
@@ -2610,23 +2617,7 @@ ensure_navigation_state()
 
 with st.sidebar:
     # Brand
-    # Brand
     st.markdown(
-        f"""<div style='padding:0.25rem 0.25rem 1.25rem'>
-          <div style='display:flex;align-items:center;gap:10px'>
-            <div style='width:36px;height:36px;flex-shrink:0;
-                        background:linear-gradient(135deg,{PRIMARY} 0%,#ff6b72 100%);
-                        border-radius:10px;display:flex;align-items:center;
-                        justify-content:center;font-size:1.15rem;
-                        box-shadow:0 3px 10px rgba(236,17,26,0.4)'>🏦</div>
-            <div>
-              <div style='font-size:0.95rem;font-weight:800;letter-spacing:-0.3px;
-                          color:#f1f5f9'>Scotiabank</div>
-              <div style='font-size:0.68rem;color:#334155;font-weight:400;margin-top:1px'>
-                Lending Intelligence</div>
-            </div>
-          </div>
-        </div>""",
         f"""<div style='padding:0.25rem 0.25rem 1.25rem'>
           <div style='display:flex;align-items:center;gap:10px'>
             <div style='width:36px;height:36px;flex-shrink:0;
@@ -2657,25 +2648,7 @@ with st.sidebar:
             f"letter-spacing:0.03em'>AI Connected</span></div>",
             unsafe_allow_html=True,
         )
-        st.markdown(
-            f"<div style='display:flex;align-items:center;gap:7px;padding:6px 10px;"
-            f"background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.18);"
-            f"border-radius:8px;margin-bottom:1rem'>"
-            f"<div style='width:6px;height:6px;border-radius:50%;background:{SUCCESS};flex-shrink:0'></div>"
-            f"<span style='font-size:0.7rem;font-weight:600;color:{SUCCESS} !important;"
-            f"letter-spacing:0.03em'>AI Connected</span></div>",
-            unsafe_allow_html=True,
-        )
     else:
-        st.markdown(
-            f"<div style='display:flex;align-items:center;gap:7px;padding:6px 10px;"
-            f"background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.18);"
-            f"border-radius:8px;margin-bottom:1rem'>"
-            f"<div style='width:6px;height:6px;border-radius:50%;background:{DANGER};flex-shrink:0'></div>"
-            f"<span style='font-size:0.7rem;font-weight:600;color:{DANGER} !important;"
-            f"letter-spacing:0.03em'>No API Key</span></div>",
-            unsafe_allow_html=True,
-        )
         st.markdown(
             f"<div style='display:flex;align-items:center;gap:7px;padding:6px 10px;"
             f"background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.18);"
@@ -2967,10 +2940,6 @@ if view == "Portfolio Overview":
         "Portfolio Overview",
         f"Scotiabank lending book · {len(df)} clients",
     )
-    page_header(
-        "Portfolio Overview",
-        f"Scotiabank lending book · {len(df)} clients",
-    )
 
     m1, m2, m3, m4, m5 = st.columns(5)
     m1.metric("Total Clients",     f"{len(df):,}")
@@ -2978,31 +2947,17 @@ if view == "Portfolio Overview":
     m3.metric("Loan Exposure",     f"${df.total_debt.sum()/1e6:.1f}M")
     m4.metric("High-Risk Clients", f"{len(df[df.risk_tier=='High'])} ({len(df[df.risk_tier=='High'])/len(df):.0%})")
     m5.metric("Total Deposits",    f"${(df.checking+df.savings).sum()/1e6:.1f}M")
-    m1.metric("Total Clients",     f"{len(df):,}")
-    m2.metric("Avg Credit Score",  f"{int(df.credit_score.mean()):,}")
-    m3.metric("Loan Exposure",     f"${df.total_debt.sum()/1e6:.1f}M")
-    m4.metric("High-Risk Clients", f"{len(df[df.risk_tier=='High'])} ({len(df[df.risk_tier=='High'])/len(df):.0%})")
-    m5.metric("Total Deposits",    f"${(df.checking+df.savings).sum()/1e6:.1f}M")
 
     st.markdown("<div style='height:6px'></div>", unsafe_allow_html=True)
-    st.markdown("<div style='height:6px'></div>", unsafe_allow_html=True)
 
-    # Row 1
     # Row 1
     c1, c2 = st.columns(2, gap="medium")
     with c1:
         section_title("Risk Tier Distribution")
-        section_title("Risk Tier Distribution")
         rc = df.risk_tier.value_counts().reset_index()
         rc.columns = ["Tier", "Count"]
         fig = px.pie(rc, names="Tier", values="Count", hole=0.55,
-        fig = px.pie(rc, names="Tier", values="Count", hole=0.55,
                      color="Tier", color_discrete_map=RISK_COLORS)
-        fig.update_traces(
-            textposition="inside", textinfo="percent+label",
-            textfont_size=12,
-            marker=dict(line=dict(color=SURFACE, width=2.5)),
-        )
         fig.update_traces(
             textposition="inside", textinfo="percent+label",
             textfont_size=12,
@@ -3014,9 +2969,7 @@ if view == "Portfolio Overview":
 
     with c2:
         section_title("Credit Score Distribution")
-        section_title("Credit Score Distribution")
         fig = px.histogram(df, x="credit_score", nbins=28,
-                           color_discrete_sequence=[PRIMARY],
                            color_discrete_sequence=[PRIMARY],
                            labels={"credit_score": "Credit Score", "count": "Clients"})
         fig.update_traces(marker_line_width=0, opacity=0.8)
@@ -3037,13 +2990,9 @@ if view == "Portfolio Overview":
     c3, c4 = st.columns(2, gap="medium")
     with c3:
         section_title("Income vs Total Debt")
-        section_title("Income vs Total Debt")
         fig = px.scatter(df, x="annual_income", y="total_debt",
                          color="risk_tier", color_discrete_map=RISK_COLORS,
                          hover_data=["name", "credit_score"],
-                         labels={"annual_income": "Annual Income ($)",
-                                 "total_debt": "Total Debt ($)", "risk_tier": "Risk"},
-                         opacity=0.75)
                          labels={"annual_income": "Annual Income ($)",
                                  "total_debt": "Total Debt ($)", "risk_tier": "Risk"},
                          opacity=0.75)
@@ -3053,12 +3002,9 @@ if view == "Portfolio Overview":
 
     with c4:
         section_title("Employment Status")
-        section_title("Employment Status")
         ec = df.employment.value_counts().reset_index()
         ec.columns = ["Status", "Count"]
         fig = px.bar(ec, x="Count", y="Status", orientation="h",
-                     color_discrete_sequence=[PRIMARY], text="Count")
-        fig.update_traces(textposition="outside", marker_line_width=0, opacity=0.85)
                      color_discrete_sequence=[PRIMARY], text="Count")
         fig.update_traces(textposition="outside", marker_line_width=0, opacity=0.85)
         fig.update_layout(yaxis=dict(categoryorder="total ascending"))
@@ -3080,6 +3026,7 @@ if view == "Portfolio Overview":
             "Risk", ["Low", "Medium", "High"],
             default=["Low", "Medium", "High"],
             label_visibility="collapsed",
+            key="portfolio_client_directory_risk_filter",
         )
     with fil_col2:
         st.markdown(
@@ -3090,6 +3037,7 @@ if view == "Portfolio Overview":
         emp_filter = st.multiselect(
             "Employment", ALL_EMP, default=ALL_EMP,
             label_visibility="collapsed",
+            key="portfolio_client_directory_employment_filter",
         )
 
     # Apply filters
@@ -3154,96 +3102,6 @@ if view == "Portfolio Overview":
             unsafe_allow_html=True,
         )
 
-
-    # ── CLIENT DIRECTORY ─────────────────────────────────────────────────────
-    st.markdown("<div style='height:12px'></div>", unsafe_allow_html=True)
-    section_title("Client Directory")
-
-    ALL_EMP = sorted(df.employment.unique().tolist())
-    fil_col1, fil_col2 = st.columns([1, 2])
-    with fil_col1:
-        st.markdown(
-            f"<div style='font-size:0.68rem;font-weight:700;color:{MUTED};"
-            f"text-transform:uppercase;letter-spacing:0.07em;margin-bottom:4px'>Risk Tier</div>",
-            unsafe_allow_html=True,
-        )
-        risk_filter = st.multiselect(
-            "Risk", ["Low", "Medium", "High"],
-            default=["Low", "Medium", "High"],
-            label_visibility="collapsed",
-        )
-    with fil_col2:
-        st.markdown(
-            f"<div style='font-size:0.68rem;font-weight:700;color:{MUTED};"
-            f"text-transform:uppercase;letter-spacing:0.07em;margin-bottom:4px'>Employment</div>",
-            unsafe_allow_html=True,
-        )
-        emp_filter = st.multiselect(
-            "Employment", ALL_EMP, default=ALL_EMP,
-            label_visibility="collapsed",
-        )
-
-    # Apply filters
-    filtered = df[df.risk_tier.isin(risk_filter) & df.employment.isin(emp_filter)]
-
-    # Result count
-    st.markdown(
-        f"<div style='font-size:0.78rem;color:{MUTED};margin-bottom:0.9rem;font-weight:500'>"
-        f"Showing <b style='color:{DARK}'>{len(filtered)}</b> of {len(df)} clients</div>",
-        unsafe_allow_html=True,
-    )
-
-    # Client card grid
-    def client_card(row):
-        rc          = RISK_COLORS[row.risk_tier]
-        rbg         = RISK_BG[row.risk_tier]
-        score_pct   = max(0, min(100, (row.credit_score - 300) / 550 * 100))
-        score_color = SUCCESS if row.credit_score >= 720 else (WARNING if row.credit_score >= 650 else DANGER)
-        dti_color   = SUCCESS if row.dti < 0.35 else (WARNING if row.dti < 0.50 else DANGER)
-        initials    = "".join(n[0] for n in str(row["name"]).split()[:2]).upper()
-        bk          = f"<span style='font-size:0.58rem;color:{DANGER};font-weight:700'>BK</span>" if row.bankruptcy else ""
-        # Build card as a list of joined strings — no triple-quotes, no leading spaces that trigger markdown code blocks
-        parts = [
-            f"<div style='background:{SURFACE};border:1px solid {BORDER};border-radius:16px;padding:1.1rem 1.15rem 0.95rem;box-shadow:0 1px 2px rgba(0,0,0,0.04),0 4px 14px rgba(0,0,0,0.03)'>",
-            f"<div style='display:flex;align-items:center;gap:9px;margin-bottom:11px'>",
-            f"<div style='width:38px;height:38px;border-radius:11px;background:{rc}18;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:0.88rem;font-weight:800;color:{rc}'>{initials}</div>",
-            f"<div style='min-width:0;flex-grow:1'>",
-            f"<div style='font-weight:700;font-size:0.875rem;color:{DARK};white-space:nowrap;overflow:hidden;text-overflow:ellipsis'>{row['name']}</div>",
-            f"<div style='font-size:0.66rem;color:{MUTED};margin-top:1px'>{row['id']} · Age {row['age']}</div>",
-            f"</div>{bk}</div>",
-            f"<div style='margin-bottom:11px'>",
-            f"<div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:4px'>",
-            f"<span style='font-size:0.58rem;color:{MUTED};text-transform:uppercase;letter-spacing:0.07em;font-weight:600'>Credit Score</span>",
-            f"<span style='font-size:0.78rem;font-weight:800;color:{score_color}'>{int(row.credit_score)}</span>",
-            f"</div>",
-            f"<div style='height:5px;background:{BG};border-radius:5px;overflow:hidden'>",
-            f"<div style='height:100%;width:{score_pct:.1f}%;background:linear-gradient(90deg,{score_color}99,{score_color});border-radius:5px'></div>",
-            f"</div></div>",
-            f"<div style='display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-bottom:11px'>",
-            f"<div style='background:{BG};border-radius:9px;padding:6px 8px'><div style='font-size:0.55rem;color:{MUTED};text-transform:uppercase;letter-spacing:0.06em;font-weight:600'>Income</div><div style='font-size:0.82rem;font-weight:700;color:{DARK};margin-top:1px'>${row.annual_income/1000:.0f}k</div></div>",
-            f"<div style='background:{BG};border-radius:9px;padding:6px 8px'><div style='font-size:0.55rem;color:{MUTED};text-transform:uppercase;letter-spacing:0.06em;font-weight:600'>DTI</div><div style='font-size:0.82rem;font-weight:700;color:{dti_color};margin-top:1px'>{row.dti:.0%}</div></div>",
-            f"<div style='background:{BG};border-radius:9px;padding:6px 8px'><div style='font-size:0.55rem;color:{MUTED};text-transform:uppercase;letter-spacing:0.06em;font-weight:600'>Assets</div><div style='font-size:0.82rem;font-weight:700;color:{DARK};margin-top:1px'>${row.total_assets/1000:.0f}k</div></div>",
-            f"<div style='background:{BG};border-radius:9px;padding:6px 8px'><div style='font-size:0.55rem;color:{MUTED};text-transform:uppercase;letter-spacing:0.06em;font-weight:600'>Loans</div><div style='font-size:0.82rem;font-weight:700;color:{DARK};margin-top:1px'>{int(row.active_loans)} active</div></div>",
-            f"</div>",
-            f"<div style='display:flex;justify-content:space-between;align-items:center;padding-top:9px;border-top:1px solid {BORDER}'>",
-            f"<span style='background:{rbg};color:{rc};font-size:0.6rem;font-weight:700;padding:2px 9px;border-radius:20px;border:1px solid {rc}28;letter-spacing:0.06em;text-transform:uppercase'>{row.risk_tier} Risk</span>",
-            f"<span style='font-size:0.66rem;color:{MUTED}'>{row.employment}</span>",
-            f"</div></div>",
-        ]
-        return "".join(parts)
-
-    if filtered.empty:
-        st.markdown(
-            f"<div style='text-align:center;padding:3rem;color:{MUTED}'>No clients match filters.</div>",
-            unsafe_allow_html=True,
-        )
-    else:
-        cards_html = "".join(client_card(row) for _, row in filtered.iterrows())
-        st.markdown(
-            "<div style='display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:12px'>"
-            + cards_html + "</div>",
-            unsafe_allow_html=True,
-        )
 
 # ─────────────────────────────────────────────────────────────────────────────
 # VIEW 2 — CLIENT PROFILE
@@ -3256,20 +3114,9 @@ elif view == "Client Profile":
         f"{c['id']} · {c['job_title']} · Member since {c['member_since']}",
         badge=f"{c['risk_tier']} Risk",
         badge_color=RISK_COLORS[c["risk_tier"]],
-    page_header(
-        c["name"],
-        f"{c['id']} · {c['job_title']} · Member since {c['member_since']}",
-        badge=f"{c['risk_tier']} Risk",
-        badge_color=RISK_COLORS[c["risk_tier"]],
     )
 
     m1, m2, m3, m4, m5, m6 = st.columns(6)
-    m1.metric("Credit Score",  c["credit_score"])
-    m2.metric("Annual Income", f"${c['annual_income']:,}")
-    m3.metric("Checking",      f"${c['checking_balance']:,}")
-    m4.metric("Savings",       f"${c['savings_balance']:,}")
-    m5.metric("Total Debt",    f"${c['total_debt']:,}")
-    m6.metric("DTI",           f"{c['debt_to_income_ratio']:.1%}")
     m1.metric("Credit Score",  c["credit_score"])
     m2.metric("Annual Income", f"${c['annual_income']:,}")
     m3.metric("Checking",      f"${c['checking_balance']:,}")
@@ -3372,12 +3219,10 @@ elif view == "Client Profile":
             c1, c2 = st.columns(2, gap="medium")
             with c1:
                 section_title("Monthly Cash Flow")
-                section_title("Monthly Cash Flow")
                 mo = txn_df.groupby(txn_df["date"].dt.to_period("M"))["amount"].sum().reset_index()
                 mo["date"] = mo["date"].astype(str)
                 mo["type"] = mo["amount"].apply(lambda x: "Inflow" if x >= 0 else "Outflow")
                 fig = px.bar(mo, x="date", y="amount", color="type",
-                             color_discrete_map={"Inflow": SUCCESS, "Outflow": PRIMARY},
                              color_discrete_map={"Inflow": SUCCESS, "Outflow": PRIMARY},
                              labels={"date": "Month", "amount": "Net ($)", "type": ""})
                 fig.update_traces(marker_line_width=0, opacity=0.85)
@@ -3396,11 +3241,9 @@ elif view == "Client Profile":
 
             with c2:
                 section_title("Spending by Category")
-                section_title("Spending by Category")
                 exp = txn_df[txn_df["amount"] < 0].copy()
                 exp["amount"] = exp["amount"].abs()
                 cs = exp.groupby("category")["amount"].sum().reset_index()
-                fig = px.pie(cs, names="category", values="amount", hole=0.48,
                 fig = px.pie(cs, names="category", values="amount", hole=0.48,
                              color_discrete_sequence=px.colors.qualitative.Pastel)
                 fig.update_traces(textposition="inside", textinfo="percent",
@@ -3497,12 +3340,6 @@ elif view == "Client Profile":
                     f"<span style='font-weight:700'>{l['type']} Loan</span>"
                     f" — <span style='color:{MUTED}'>Closed · ${l['amount']:,} · "
                     f"{l['start_date']} → {l['end_date']}</span></div>",
-                    f"<div style='background:{SURFACE};border:1px solid {BORDER};"
-                    f"border-radius:13px;padding:0.9rem 1.25rem;margin-bottom:0.5rem;"
-                    f"opacity:0.55;font-size:0.855rem'>"
-                    f"<span style='font-weight:700'>{l['type']} Loan</span>"
-                    f" — <span style='color:{MUTED}'>Closed · ${l['amount']:,} · "
-                    f"{l['start_date']} → {l['end_date']}</span></div>",
                     unsafe_allow_html=True,
                 )
         if not loans:
@@ -3533,28 +3370,21 @@ elif view == "Client Profile":
                 fill="toself", name="",
                 fillcolor=f"rgba(236,17,26,0.12)",
                 line=dict(color=PRIMARY, width=2.5),
-                fillcolor=f"rgba(236,17,26,0.12)",
-                line=dict(color=PRIMARY, width=2.5),
             ))
             fig.update_layout(
                 polar=dict(
                     radialaxis=dict(visible=True, range=[0, 100],
                                     tickfont=dict(size=9), gridcolor="#e2e8f0"),
-                    radialaxis=dict(visible=True, range=[0, 100],
-                                    tickfont=dict(size=9), gridcolor="#e2e8f0"),
                     angularaxis=dict(tickfont=dict(size=11)),
-                    bgcolor=SURFACE,
                     bgcolor=SURFACE,
                 ),
                 showlegend=False, height=360,
-                paper_bgcolor=SURFACE, margin=dict(l=40, r=40, t=40, b=40),
                 paper_bgcolor=SURFACE, margin=dict(l=40, r=40, t=40, b=40),
             )
             st.plotly_chart(fig, use_container_width=True)
 
 
         with c2:
-            section_title(f"Peer Comparison — {c['risk_tier']} Risk Tier")
             section_title(f"Peer Comparison — {c['risk_tier']} Risk Tier")
             peers = df[df.risk_tier == c["risk_tier"]]
             compare_items = [
@@ -3710,59 +3540,7 @@ elif view == "Loan Assessment":
     dti_color   = SUCCESS if c["debt_to_income_ratio"] < 0.35 else (
                   WARNING if c["debt_to_income_ratio"] < 0.50 else DANGER)
 
-
-    # ── Compact client context bar ────────────────────────────────────────────
-    rc  = RISK_COLORS[c["risk_tier"]]
-    rbg = RISK_BG[c["risk_tier"]]
-    score_color = (SUCCESS if c["credit_score"] >= 720
-                   else WARNING if c["credit_score"] >= 650 else DANGER)
-    dti_color   = SUCCESS if c["debt_to_income_ratio"] < 0.35 else (
-                  WARNING if c["debt_to_income_ratio"] < 0.50 else DANGER)
-
     st.markdown(
-        f"""<div style='background:{SURFACE};border:1px solid {BORDER};border-radius:18px;
-                        padding:1.25rem 1.75rem;margin-bottom:1.25rem;
-                        box-shadow:0 1px 3px rgba(0,0,0,0.04);border-left:4px solid {PRIMARY}'>
-          <div style='display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1rem'>
-            <div>
-              <div style='display:flex;align-items:center;gap:10px'>
-                <span style='font-size:1.25rem;font-weight:800;color:{DARK};letter-spacing:-0.4px'>
-                  Loan Assessment</span>
-                <span style='background:{rbg};color:{rc};font-size:0.68rem;font-weight:700;
-                             padding:3px 10px;border-radius:20px;border:1px solid {rc}30;
-                             letter-spacing:0.05em;text-transform:uppercase'>{c["risk_tier"]} Risk</span>
-              </div>
-              <div style='font-size:0.82rem;color:{MUTED};margin-top:4px'>
-                {c["name"]} · {c["id"]} · {c["job_title"]}</div>
-            </div>
-            <div style='display:flex;gap:2rem'>
-              <div style='text-align:center'>
-                <div style='font-size:0.62rem;font-weight:700;text-transform:uppercase;
-                            letter-spacing:0.08em;color:{MUTED}'>Credit Score</div>
-                <div style='font-size:1.4rem;font-weight:800;color:{score_color};margin-top:1px'>
-                  {c["credit_score"]}</div>
-              </div>
-              <div style='text-align:center'>
-                <div style='font-size:0.62rem;font-weight:700;text-transform:uppercase;
-                            letter-spacing:0.08em;color:{MUTED}'>Annual Income</div>
-                <div style='font-size:1.4rem;font-weight:800;color:{DARK};margin-top:1px'>
-                  ${c["annual_income"]:,}</div>
-              </div>
-              <div style='text-align:center'>
-                <div style='font-size:0.62rem;font-weight:700;text-transform:uppercase;
-                            letter-spacing:0.08em;color:{MUTED}'>Current DTI</div>
-                <div style='font-size:1.4rem;font-weight:800;color:{dti_color};margin-top:1px'>
-                  {c["debt_to_income_ratio"]:.1%}</div>
-              </div>
-              <div style='text-align:center'>
-                <div style='font-size:0.62rem;font-weight:700;text-transform:uppercase;
-                            letter-spacing:0.08em;color:{MUTED}'>Risk Score</div>
-                <div style='font-size:1.4rem;font-weight:800;color:{rc};margin-top:1px'>
-                  {c["risk_score"]:.0f}<span style='font-size:0.75rem;font-weight:500;color:{MUTED}'>/100</span></div>
-              </div>
-            </div>
-          </div>
-        </div>""",
         f"""<div style='background:{SURFACE};border:1px solid {BORDER};border-radius:18px;
                         padding:1.25rem 1.75rem;margin-bottom:1.25rem;
                         box-shadow:0 1px 3px rgba(0,0,0,0.04);border-left:4px solid {PRIMARY}'>
@@ -3809,10 +3587,9 @@ elif view == "Loan Assessment":
         unsafe_allow_html=True,
     )
 
-    col1, col2 = st.columns([1, 1.65], gap="large")
-    col1, col2 = st.columns([1, 1.65], gap="large")
+    st.markdown("<div style='height:18px'></div>", unsafe_allow_html=True)
+    col1, col2 = st.columns([0.95, 1.25], gap="large")
 
-    # ── LEFT: Form panel ──────────────────────────────────────────────────────
     # ── LEFT: Form panel ──────────────────────────────────────────────────────
     with col1:
         # Loan type selector — styled as a pill toggle group
@@ -3835,38 +3612,23 @@ elif view == "Loan Assessment":
         if "loan_type_sel" not in st.session_state:
             st.session_state.loan_type_sel = "Personal"
 
-        btn_cols = st.columns(3)
+        btn_cols = st.columns(3, gap="small")
         for idx, lt in enumerate(LOAN_TYPES):
             meta = LOAN_META[lt]
             is_active = st.session_state.loan_type_sel == lt
-            bg     = PRIMARY if is_active else SURFACE
-            color  = "white" if is_active else MUTED
-            border = f"1px solid {PRIMARY}" if is_active else f"1px solid {BORDER}"
             if btn_cols[idx % 3].button(
                 f"{meta['icon']} {lt}",
-                key=f"lt_{lt}",
+                key=f"loan_type_{lt.lower().replace(' ', '_')}",
+                type="primary" if is_active else "secondary",
                 use_container_width=True,
             ):
                 st.session_state.loan_type_sel = lt
                 st.rerun()
-            # Override button style via targeted CSS injection
-            st.markdown(
-                f"<style>div[data-testid='stButton'] button[kind='secondary'] {{}}</style>",
-                unsafe_allow_html=True,
-            )
 
         loan_type = st.session_state.loan_type_sel
         meta      = LOAN_META[loan_type]
 
         st.markdown("<div style='height:4px'></div>", unsafe_allow_html=True)
-
-        # Amount + Term in a clean white card
-        st.markdown(
-            f"<div style='background:{SURFACE};border:1px solid {BORDER};"
-            f"border-radius:16px;padding:1.4rem 1.5rem;"
-            f"box-shadow:0 1px 3px rgba(0,0,0,0.04);margin-top:4px'>",
-            unsafe_allow_html=True,
-        )
 
         st.markdown(
             f"<div style='font-size:0.7rem;font-weight:700;text-transform:uppercase;"
@@ -3950,149 +3712,8 @@ elif view == "Loan Assessment":
             </div>""",
             unsafe_allow_html=True,
         )
-        # Loan type selector — styled as a pill toggle group
-        LOAN_TYPES = ["Personal", "Auto", "Mortgage", "Business", "Student", "Line of Credit"]
-        LOAN_META  = {
-            "Personal":       {"icon": "💳", "rate": 9.5,  "max": 100_000,   "terms": [12,24,36,48,60]},
-            "Auto":           {"icon": "🚗", "rate": 6.9,  "max": 150_000,   "terms": [24,36,48,60,72,84]},
-            "Mortgage":       {"icon": "🏠", "rate": 5.5,  "max": 1_500_000, "terms": [120,180,240,300,360]},
-            "Business":       {"icon": "💼", "rate": 8.5,  "max": 500_000,   "terms": [12,24,36,60,84]},
-            "Student":        {"icon": "🎓", "rate": 6.0,  "max": 150_000,   "terms": [60,84,120]},
-            "Line of Credit": {"icon": "🔄", "rate": 10.5, "max": 100_000,   "terms": [12,24,36]},
-        }
-
-        # Loan type pill buttons
-        st.markdown(
-            f"<div style='font-size:0.7rem;font-weight:700;text-transform:uppercase;"
-            f"letter-spacing:0.08em;color:{MUTED};margin-bottom:8px'>Loan Type</div>",
-            unsafe_allow_html=True,
-        )
-        if "loan_type_sel" not in st.session_state:
-            st.session_state.loan_type_sel = "Personal"
-
-        btn_cols = st.columns(3)
-        for idx, lt in enumerate(LOAN_TYPES):
-            meta = LOAN_META[lt]
-            is_active = st.session_state.loan_type_sel == lt
-            bg     = PRIMARY if is_active else SURFACE
-            color  = "white" if is_active else MUTED
-            border = f"1px solid {PRIMARY}" if is_active else f"1px solid {BORDER}"
-            if btn_cols[idx % 3].button(
-                f"{meta['icon']} {lt}",
-                key=f"lt_{lt}",
-                use_container_width=True,
-            ):
-                st.session_state.loan_type_sel = lt
-                st.rerun()
-            # Override button style via targeted CSS injection
-            st.markdown(
-                f"<style>div[data-testid='stButton'] button[kind='secondary'] {{}}</style>",
-                unsafe_allow_html=True,
-            )
-
-        loan_type = st.session_state.loan_type_sel
-        meta      = LOAN_META[loan_type]
-
-        st.markdown("<div style='height:4px'></div>", unsafe_allow_html=True)
-
-        # Amount + Term in a clean white card
-        st.markdown(
-            f"<div style='background:{SURFACE};border:1px solid {BORDER};"
-            f"border-radius:16px;padding:1.4rem 1.5rem;"
-            f"box-shadow:0 1px 3px rgba(0,0,0,0.04);margin-top:4px'>",
-            unsafe_allow_html=True,
-        )
-
-        st.markdown(
-            f"<div style='font-size:0.7rem;font-weight:700;text-transform:uppercase;"
-            f"letter-spacing:0.08em;color:{MUTED};margin-bottom:6px'>Loan Amount</div>",
-            unsafe_allow_html=True,
-        )
-        amount = st.number_input(
-            "Loan Amount",
-            min_value=1_000, max_value=meta["max"],
-            value=min(25_000, meta["max"]), step=1_000,
-            label_visibility="collapsed",
-        )
-
-        st.markdown("<div style='height:6px'></div>", unsafe_allow_html=True)
-        st.markdown(
-            f"<div style='font-size:0.7rem;font-weight:700;text-transform:uppercase;"
-            f"letter-spacing:0.08em;color:{MUTED};margin-bottom:6px'>Term</div>",
-            unsafe_allow_html=True,
-        )
-        term_options = {f"{t} months ({t//12}yr {t%12}mo)".replace(" 0mo","") if t >= 12 else f"{t} months": t
-                        for t in meta["terms"]}
-        term_label = st.selectbox("Term", list(term_options.keys()), label_visibility="collapsed")
-        term = term_options[term_label]
-
-        # Live calculations
-        r       = meta["rate"] / 100 / 12
-        est_pmt = round(amount * r / (1 - (1 + r) ** -term), 2)
-        new_dti = round((c["total_debt"] + amount) / max(c["annual_income"], 1), 4)
-        dti_delta = new_dti - c["debt_to_income_ratio"]
-        pti       = round((est_pmt / (c["annual_income"] / 12)) * 100, 1)
-
-        pmt_ok  = pti < 15
-        dti_ok  = new_dti < 0.45
-
-        st.markdown("<div style='height:10px'></div>", unsafe_allow_html=True)
-        st.markdown(
-            f"""<div style='background:{BG};border-radius:12px;padding:1rem 1.1rem'>
-              <div style='font-size:0.62rem;font-weight:700;text-transform:uppercase;
-                          letter-spacing:0.09em;color:{MUTED};margin-bottom:10px'>
-                Live Calculation</div>
-              <div style='display:grid;grid-template-columns:1fr 1fr;gap:10px'>
-                <div style='background:{SURFACE};border-radius:10px;padding:0.75rem 0.9rem;
-                            border:1px solid {BORDER}'>
-                  <div style='font-size:0.6rem;color:{MUTED};text-transform:uppercase;
-                              letter-spacing:0.07em;font-weight:600'>Monthly Payment</div>
-                  <div style='font-size:1.2rem;font-weight:800;color:{DARK};margin-top:2px'>
-                    ${est_pmt:,.0f}</div>
-                  <div style='font-size:0.7rem;margin-top:2px;color:{"#16a34a" if pmt_ok else DANGER};
-                              font-weight:500'>
-                    {"✓" if pmt_ok else "⚠"} {pti:.1f}% of income</div>
-                </div>
-                <div style='background:{SURFACE};border-radius:10px;padding:0.75rem 0.9rem;
-                            border:1px solid {BORDER}'>
-                  <div style='font-size:0.6rem;color:{MUTED};text-transform:uppercase;
-                              letter-spacing:0.07em;font-weight:600'>DTI After Loan</div>
-                  <div style='font-size:1.2rem;font-weight:800;color:{DARK};margin-top:2px'>
-                    {new_dti:.1%}</div>
-                  <div style='font-size:0.7rem;margin-top:2px;color:{"#16a34a" if dti_ok else DANGER};
-                              font-weight:500'>
-                    {"✓" if dti_ok else "⚠"} {dti_delta:+.1%} change</div>
-                </div>
-                <div style='background:{SURFACE};border-radius:10px;padding:0.75rem 0.9rem;
-                            border:1px solid {BORDER}'>
-                  <div style='font-size:0.6rem;color:{MUTED};text-transform:uppercase;
-                              letter-spacing:0.07em;font-weight:600'>Est. Rate</div>
-                  <div style='font-size:1.2rem;font-weight:800;color:{DARK};margin-top:2px'>
-                    {meta["rate"]}%</div>
-                  <div style='font-size:0.7rem;margin-top:2px;color:{MUTED};font-weight:500'>
-                    APR (base)</div>
-                </div>
-                <div style='background:{SURFACE};border-radius:10px;padding:0.75rem 0.9rem;
-                            border:1px solid {BORDER}'>
-                  <div style='font-size:0.6rem;color:{MUTED};text-transform:uppercase;
-                              letter-spacing:0.07em;font-weight:600'>Total Cost</div>
-                  <div style='font-size:1.2rem;font-weight:800;color:{DARK};margin-top:2px'>
-                    ${est_pmt * term:,.0f}</div>
-                  <div style='font-size:0.7rem;margin-top:2px;color:{MUTED};font-weight:500'>
-                    over {term} months</div>
-                </div>
-              </div>
-            </div>""",
-            unsafe_allow_html=True,
-        )
-
-        st.markdown("<div style='height:12px'></div>", unsafe_allow_html=True)
         st.markdown("<div style='height:12px'></div>", unsafe_allow_html=True)
         run = st.button("Run AI Assessment →", type="primary", use_container_width=True)
-        st.markdown("</div>", unsafe_allow_html=True)
-
-    # ── RIGHT: Results panel ──────────────────────────────────────────────────
-        st.markdown("</div>", unsafe_allow_html=True)
 
     # ── RIGHT: Results panel ──────────────────────────────────────────────────
     with col2:
@@ -4112,16 +3733,6 @@ elif view == "Loan Assessment":
                 f"✗  Declined" if declined else
                 f"~  Conditional"
             )
-            text     = st.session_state[key]
-            approved = "APPROVED" in text.upper() and "DECLINED" not in text.upper()
-            declined = "DECLINED" in text.upper()
-            decision = "APPROVED" if approved else "DECLINED" if declined else "CONDITIONAL"
-            bar_color = SUCCESS if approved else DANGER if declined else WARNING
-            dec_label = (
-                f"✓  Approved" if approved else
-                f"✗  Declined" if declined else
-                f"~  Conditional"
-            )
             st.markdown(
                 f"""<div style='background:{bar_color}10;border:1px solid {bar_color}30;
                                 border-radius:14px;padding:0.85rem 1.25rem;margin-bottom:1rem;
@@ -4134,40 +3745,17 @@ elif view == "Loan Assessment":
             )
             st.markdown(
                 f"<div style='background:{SURFACE};border:1px solid {BORDER};border-radius:16px;"
-                f"padding:1.5rem 1.75rem;box-shadow:0 1px 3px rgba(0,0,0,0.04)'>",
-                f"""<div style='background:{bar_color}10;border:1px solid {bar_color}30;
-                                border-radius:14px;padding:0.85rem 1.25rem;margin-bottom:1rem;
-                                display:flex;align-items:center;gap:10px'>
-                  <div style='width:8px;height:8px;border-radius:50%;
-                              background:{bar_color};flex-shrink:0'></div>
-                  <span style='font-weight:700;font-size:0.85rem;color:{bar_color}'>{dec_label}</span>
-                </div>""",
-                unsafe_allow_html=True,
-            )
-            st.markdown(
-                f"<div style='background:{SURFACE};border:1px solid {BORDER};border-radius:16px;"
-                f"padding:1.5rem 1.75rem;box-shadow:0 1px 3px rgba(0,0,0,0.04)'>",
+                f"padding:1.25rem 1.35rem;box-shadow:0 1px 3px rgba(0,0,0,0.04);"
+                f"min-height:260px;width:100%;max-width:100%;box-sizing:border-box;overflow:hidden'>",
                 unsafe_allow_html=True,
             )
             st.markdown(text)
             st.markdown("</div>", unsafe_allow_html=True)
-            st.markdown("</div>", unsafe_allow_html=True)
         else:
             st.markdown(
                 f"""<div style='background:{SURFACE};border:2px dashed {BORDER};border-radius:18px;
-                                padding:4rem 2rem;text-align:center;height:100%;
-                                display:flex;flex-direction:column;align-items:center;
-                                justify-content:center'>
-                  <div style='width:52px;height:52px;background:{BG};border-radius:14px;
-                              display:flex;align-items:center;justify-content:center;
-                              font-size:1.5rem;margin:0 auto 1rem'>📋</div>
-                  <div style='font-size:0.95rem;font-weight:600;color:{DARK};margin-bottom:6px'>
-                    No assessment yet</div>
-                  <div style='font-size:0.82rem;color:{MUTED};max-width:220px;line-height:1.5'>
-                    Configure loan parameters and click <b>Run AI Assessment</b></div>
-                </div>""",
-                f"""<div style='background:{SURFACE};border:2px dashed {BORDER};border-radius:18px;
-                                padding:4rem 2rem;text-align:center;height:100%;
+                                padding:2.5rem 1.5rem;text-align:center;min-height:260px;
+                                width:100%;max-width:100%;box-sizing:border-box;overflow:hidden;
                                 display:flex;flex-direction:column;align-items:center;
                                 justify-content:center'>
                   <div style='width:52px;height:52px;background:{BG};border-radius:14px;
@@ -4187,35 +3775,22 @@ elif view == "Loan Assessment":
 # ─────────────────────────────────────────────────────────────────────────────
 
 elif view == "Forecasting":
-    page_header("Forecasting & Analytics", "Client projections and portfolio trends")
-    tabs_f = st.tabs(["Credit Score", "Income Projection", "Risk Evolution", "Portfolio Health"])
+    c = sel
+    customer_seed = stable_seed_from_customer_id(c.get("id") or c.get("customer_id"))
     page_header("Forecasting & Analytics", "Client projections and portfolio trends")
     tabs_f = st.tabs(["Credit Score", "Income Projection", "Risk Evolution", "Portfolio Health"])
 
     with tabs_f[0]:
-        c = sel
         section_title(f"Credit Score Forecast — {c['name']} (24 months)")
-        section_title(f"Credit Score Forecast — {c['name']} (24 months)")
-        np.random.seed(int(c["id"][1:]))
-        imp    = {"High": 0.35, "Medium": 0.18, "Low": 0.05}[c["risk_tier"]]
-        imp    = {"High": 0.35, "Medium": 0.18, "Low": 0.05}[c["risk_tier"]]
+        np.random.seed(customer_seed)
+        imp = {"High": 0.35, "Medium": 0.18, "Low": 0.05}[c["risk_tier"]]
         months = list(range(25))
-        noise  = np.random.normal(0, 3, 25)
+        noise = np.random.normal(0, 3, 25)
         scores = [min(850, c["credit_score"] + imp * m * 5 + noise[m]) for m in months]
-        upper  = [min(850, s + 18) for s in scores]
-        lower  = [max(300, s - 18) for s in scores]
+        upper = [min(850, s + 18) for s in scores]
+        lower = [max(300, s - 18) for s in scores]
 
         fig = go.Figure()
-        fig.add_trace(go.Scatter(
-            x=months + months[::-1], y=upper + lower[::-1],
-            fill="toself", fillcolor="rgba(236,17,26,0.07)",
-            line=dict(color="rgba(0,0,0,0)"), showlegend=False,
-        ))
-        fig.add_trace(go.Scatter(
-            x=months, y=scores, name="Projected",
-            mode="lines+markers", line=dict(color=PRIMARY, width=2.5),
-            marker=dict(size=5),
-        ))
         fig.add_trace(go.Scatter(
             x=months + months[::-1], y=upper + lower[::-1],
             fill="toself", fillcolor="rgba(236,17,26,0.07)",
@@ -4229,79 +3804,66 @@ elif view == "Forecasting":
         fig.add_hline(y=750, line_dash="dot", line_color="#3b82f6", line_width=1.5,
                       annotation_text="Excellent (750)", annotation_position="right")
         fig.add_hline(y=700, line_dash="dot", line_color=SUCCESS, line_width=1.5,
-        fig.add_hline(y=700, line_dash="dot", line_color=SUCCESS, line_width=1.5,
                       annotation_text="Good (700)", annotation_position="right")
-        fig.update_layout(xaxis_title="Months from Today", yaxis_title="Credit Score",
-                          yaxis=dict(range=[300, 870]))
+        fig.update_layout(
+            xaxis_title="Months from Today",
+            yaxis_title="Credit Score",
+            yaxis=dict(range=[300, 870]),
+        )
         st.plotly_chart(chart(fig, 380), use_container_width=True)
 
         n1, n2, n3 = st.columns(3)
-        n1.metric("Current",   int(scores[0]))
-        n2.metric("12-Month",  int(scores[12]), delta=f"{int(scores[12]-scores[0]):+d}")
-        n3.metric("24-Month",  int(scores[24]), delta=f"{int(scores[24]-scores[0]):+d}")
-
-        n1.metric("Current",   int(scores[0]))
-        n2.metric("12-Month",  int(scores[12]), delta=f"{int(scores[12]-scores[0]):+d}")
-        n3.metric("24-Month",  int(scores[24]), delta=f"{int(scores[24]-scores[0]):+d}")
+        n1.metric("Current", int(scores[0]))
+        n2.metric("12-Month", int(scores[12]), delta=f"{int(scores[12] - scores[0]):+d}")
+        n3.metric("24-Month", int(scores[24]), delta=f"{int(scores[24] - scores[0]):+d}")
 
     with tabs_f[1]:
-        c = sel
-        section_title("Income & Savings Projection — 5 Years")
         section_title("Income & Savings Projection — 5 Years")
         growth = {"Full-Time": 0.04, "Self-Employed": 0.06, "Part-Time": 0.02,
                   "Unemployed": 0.0, "Retired": 0.01}.get(c["employment_status"], 0.03)
-        np.random.seed(int(c["id"][1:]) + 1)
-        yrs     = list(range(6))
-        income  = [c["annual_income"] * (1 + growth) ** y
-                   + np.random.normal(0, c["annual_income"] * 0.015) for y in yrs]
-        income  = [c["annual_income"] * (1 + growth) ** y
-                   + np.random.normal(0, c["annual_income"] * 0.015) for y in yrs]
+        np.random.seed(customer_seed + 1)
+        yrs = list(range(6))
+        income = [
+            c["annual_income"] * (1 + growth) ** y
+            + np.random.normal(0, c["annual_income"] * 0.015)
+            for y in yrs
+        ]
         expense = [c["monthly_expenses"] * 12 * (1.025 ** y) for y in yrs]
-        net     = [i - e for i, e in zip(income, expense)]
-        labels  = [f"Year {y}" for y in yrs]
+        net = [i - e for i, e in zip(income, expense)]
+        labels = [f"Year {y}" for y in yrs]
 
         fig = go.Figure()
-        fig.add_trace(go.Bar(name="Income",   x=labels, y=income,
-                             marker_color=SUCCESS, opacity=0.85))
-        fig.add_trace(go.Bar(name="Expenses", x=labels, y=expense,
-                             marker_color=PRIMARY, opacity=0.85))
-        fig.add_trace(go.Bar(name="Income",   x=labels, y=income,
+        fig.add_trace(go.Bar(name="Income", x=labels, y=income,
                              marker_color=SUCCESS, opacity=0.85))
         fig.add_trace(go.Bar(name="Expenses", x=labels, y=expense,
                              marker_color=PRIMARY, opacity=0.85))
         fig.add_trace(go.Scatter(name="Net Savings", x=labels, y=net,
                                  mode="lines+markers",
                                  line=dict(color="#3b82f6", width=2.5),
-                                 mode="lines+markers",
-                                 line=dict(color="#3b82f6", width=2.5),
                                  marker=dict(size=7)))
         fig.update_layout(barmode="group", yaxis_tickformat="$,.0f")
         st.plotly_chart(chart(fig, 360), use_container_width=True)
 
-
     with tabs_f[2]:
-        c = sel
         section_title(f"Risk Score Evolution — {c['name']} (8 Quarters)")
-        section_title(f"Risk Score Evolution — {c['name']} (8 Quarters)")
-        np.random.seed(int(c["id"][1:]) + 10)
-        qtrs = [f"Q{(i%4)+1} '2{'5' if i < 4 else '6'}" for i in range(9)]
+        np.random.seed(customer_seed + 10)
+        qtrs = [f"Q{(i % 4) + 1} '2{'5' if i < 4 else '6'}" for i in range(9)]
 
         base_improve = {"High": 1.8, "Medium": 0.9, "Low": 0.3}[c["risk_tier"]]
-        if c["bankruptcy_history"]: base_improve *= 0.4
-        if c["num_late_payments"] > 2: base_improve *= 0.6
+        if c["bankruptcy_history"]:
+            base_improve *= 0.4
+        if c["num_late_payments"] > 2:
+            base_improve *= 0.6
 
-        noise       = np.random.normal(0, 0.6, 9)
-        noise       = np.random.normal(0, 0.6, 9)
+        noise = np.random.normal(0, 0.6, 9)
         risk_scores = [min(100, max(0, c["risk_score"] + base_improve * i + noise[i])) for i in range(9)]
-        tier_color  = RISK_COLORS[c["risk_tier"]]
-        tier_color  = RISK_COLORS[c["risk_tier"]]
+        tier_color = RISK_COLORS[c["risk_tier"]]
+        upper = [min(100, s + 4) for s in risk_scores]
+        lower = [max(0, s - 4) for s in risk_scores]
 
         fig = go.Figure()
-        upper = [min(100, s + 4) for s in risk_scores]
-        lower = [max(0,   s - 4) for s in risk_scores]
         fig.add_trace(go.Scatter(
             x=qtrs + qtrs[::-1], y=upper + lower[::-1],
-            fill="toself", fillcolor="rgba(236,17,26,0.07)",
             fill="toself", fillcolor="rgba(236,17,26,0.07)",
             line=dict(color="rgba(0,0,0,0)"), showlegend=False,
         ))
@@ -4314,60 +3876,35 @@ elif view == "Forecasting":
                       line_width=0, annotation_text="Low Risk", annotation_position="right")
         fig.add_hrect(y0=48, y1=72, fillcolor="rgba(245,158,11,0.05)",
                       line_width=0, annotation_text="Medium Risk", annotation_position="right")
-        fig.add_hrect(y0=0,  y1=48, fillcolor="rgba(239,68,68,0.05)",
+        fig.add_hrect(y0=0, y1=48, fillcolor="rgba(239,68,68,0.05)",
                       line_width=0, annotation_text="High Risk", annotation_position="right")
-        fig.update_layout(xaxis_title="Quarter", yaxis_title="Risk Score (0–100)",
-                          yaxis=dict(range=[0, 105]))
-        fig.add_hrect(y0=72, y1=100, fillcolor="rgba(16,185,129,0.05)",
-                      line_width=0, annotation_text="Low Risk", annotation_position="right")
-        fig.add_hrect(y0=48, y1=72, fillcolor="rgba(245,158,11,0.05)",
-                      line_width=0, annotation_text="Medium Risk", annotation_position="right")
-        fig.add_hrect(y0=0,  y1=48, fillcolor="rgba(239,68,68,0.05)",
-                      line_width=0, annotation_text="High Risk", annotation_position="right")
-        fig.update_layout(xaxis_title="Quarter", yaxis_title="Risk Score (0–100)",
-                          yaxis=dict(range=[0, 105]))
+        fig.update_layout(
+            xaxis_title="Quarter",
+            yaxis_title="Risk Score (0–100)",
+            yaxis=dict(range=[0, 105]),
+        )
         st.plotly_chart(chart(fig, 360), use_container_width=True)
 
         r1, r2, r3 = st.columns(3)
         r1.metric("Current Score", f"{risk_scores[0]:.1f}/100")
         r2.metric("Q4 Projection", f"{risk_scores[4]:.1f}/100",
-                  delta=f"{risk_scores[4]-risk_scores[0]:+.1f}")
+                  delta=f"{risk_scores[4] - risk_scores[0]:+.1f}")
         r3.metric("Q8 Projection", f"{risk_scores[8]:.1f}/100",
-                  delta=f"{risk_scores[8]-risk_scores[0]:+.1f}")
-        r1.metric("Current Score", f"{risk_scores[0]:.1f}/100")
-        r2.metric("Q4 Projection", f"{risk_scores[4]:.1f}/100",
-                  delta=f"{risk_scores[4]-risk_scores[0]:+.1f}")
-        r3.metric("Q8 Projection", f"{risk_scores[8]:.1f}/100",
-                  delta=f"{risk_scores[8]-risk_scores[0]:+.1f}")
+                  delta=f"{risk_scores[8] - risk_scores[0]:+.1f}")
 
     with tabs_f[3]:
-        c = sel
         section_title(f"Financial Health Forecast — {c['name']} (5 Years)")
-        section_title(f"Financial Health Forecast — {c['name']} (5 Years)")
-        np.random.seed(int(c["id"][1:]) + 20)
+        np.random.seed(customer_seed + 20)
         months_range = list(range(0, 61, 3))
-        labels_q     = [f"Q{i//3}" for i in months_range]
-        months_range = list(range(0, 61, 3))
-        labels_q     = [f"Q{i//3}" for i in months_range]
+        labels_q = [f"Q{i // 3}" for i in months_range]
 
-        active_loans      = [l for l in c["loans"] if l["status"] == "Active"]
-        active_loans      = [l for l in c["loans"] if l["status"] == "Active"]
+        active_loans = [l for l in c["loans"] if l["status"] == "Active"]
         total_monthly_pmt = sum(l["monthly_payment"] for l in active_loans)
-        debt_curve        = []
-        debt_curve        = []
         d = float(c["total_debt"])
-        for m in months_range:
-            debt_curve.append(max(0, d - total_monthly_pmt * m * 0.85))
-            debt_curve.append(max(0, d - total_monthly_pmt * m * 0.85))
+        debt_curve = [max(0, d - total_monthly_pmt * m * 0.85) for m in months_range]
 
         growth_rate = {"Full-Time": 0.005, "Self-Employed": 0.006, "Part-Time": 0.003,
                        "Unemployed": -0.002, "Retired": 0.003}.get(c["employment_status"], 0.004)
-        asset_curve = [
-            c["total_assets"] * (1 + growth_rate) ** m
-            + np.random.normal(0, c["total_assets"] * 0.01)
-            for m in months_range
-        ]
-        net_worth = [a - dv for a, dv in zip(asset_curve, debt_curve)]
         asset_curve = [
             c["total_assets"] * (1 + growth_rate) ** m
             + np.random.normal(0, c["total_assets"] * 0.01)
@@ -4378,7 +3915,6 @@ elif view == "Forecasting":
         c1, c2 = st.columns(2, gap="medium")
         with c1:
             section_title("Debt Paydown Trajectory")
-            section_title("Debt Paydown Trajectory")
             fig = go.Figure()
             fig.add_trace(go.Scatter(
                 x=labels_q, y=debt_curve, name="Total Debt",
@@ -4390,68 +3926,43 @@ elif view == "Forecasting":
                 x=labels_q, y=asset_curve, name="Total Assets",
                 mode="lines", line=dict(color=SUCCESS, width=2, dash="dot"),
             ))
-            fig.update_layout(yaxis_tickformat="$,.0f",
-                              xaxis_title="Quarter", legend=dict(x=0.01, y=0.99))
-            fig.add_trace(go.Scatter(
-                x=labels_q, y=debt_curve, name="Total Debt",
-                mode="lines+markers", fill="tozeroy",
-                fillcolor="rgba(236,17,26,0.08)",
-                line=dict(color=PRIMARY, width=2.5), marker=dict(size=4),
-            ))
-            fig.add_trace(go.Scatter(
-                x=labels_q, y=asset_curve, name="Total Assets",
-                mode="lines", line=dict(color=SUCCESS, width=2, dash="dot"),
-            ))
-            fig.update_layout(yaxis_tickformat="$,.0f",
-                              xaxis_title="Quarter", legend=dict(x=0.01, y=0.99))
+            fig.update_layout(
+                yaxis_tickformat="$,.0f",
+                xaxis_title="Quarter",
+                legend=dict(x=0.01, y=0.99),
+            )
             st.plotly_chart(chart(fig, 320), use_container_width=True)
 
         with c2:
             section_title("Net Worth Projection")
             nw_colors = [SUCCESS if v >= 0 else DANGER for v in net_worth]
-            section_title("Net Worth Projection")
-            nw_colors = [SUCCESS if v >= 0 else DANGER for v in net_worth]
             fig = go.Figure()
             fig.add_trace(go.Bar(
                 x=labels_q, y=net_worth, name="Net Worth",
                 marker_color=nw_colors, opacity=0.85,
             ))
             fig.add_hline(y=0, line_dash="dash", line_color=MUTED, line_width=1)
-            fig.update_layout(yaxis_tickformat="$,.0f",
-                              xaxis_title="Quarter", showlegend=False)
-            fig.add_trace(go.Bar(
-                x=labels_q, y=net_worth, name="Net Worth",
-                marker_color=nw_colors, opacity=0.85,
-            ))
-            fig.add_hline(y=0, line_dash="dash", line_color=MUTED, line_width=1)
-            fig.update_layout(yaxis_tickformat="$,.0f",
-                              xaxis_title="Quarter", showlegend=False)
+            fig.update_layout(
+                yaxis_tickformat="$,.0f",
+                xaxis_title="Quarter",
+                showlegend=False,
+            )
             st.plotly_chart(chart(fig, 320), use_container_width=True)
 
         p1, p2, p3, p4 = st.columns(4)
-        p1.metric("Monthly Debt Payments",  f"${total_monthly_pmt:,.0f}")
-        p2.metric("Projected Debt (5yr)",   f"${debt_curve[-1]:,.0f}",
-                  delta=f"${debt_curve[-1]-debt_curve[0]:+,.0f}")
+        p1.metric("Monthly Debt Payments", f"${total_monthly_pmt:,.0f}")
+        p2.metric("Projected Debt (5yr)", f"${debt_curve[-1]:,.0f}",
+                  delta=f"${debt_curve[-1] - debt_curve[0]:+,.0f}")
         p3.metric("Projected Assets (5yr)", f"${asset_curve[-1]:,.0f}",
-                  delta=f"${asset_curve[-1]-asset_curve[0]:+,.0f}")
-        p4.metric("Net Worth (5yr)",        f"${net_worth[-1]:,.0f}",
-                  delta=f"${net_worth[-1]-net_worth[0]:+,.0f}")
-
-        p2.metric("Projected Debt (5yr)",   f"${debt_curve[-1]:,.0f}",
-                  delta=f"${debt_curve[-1]-debt_curve[0]:+,.0f}")
-        p3.metric("Projected Assets (5yr)", f"${asset_curve[-1]:,.0f}",
-                  delta=f"${asset_curve[-1]-asset_curve[0]:+,.0f}")
-        p4.metric("Net Worth (5yr)",        f"${net_worth[-1]:,.0f}",
-                  delta=f"${net_worth[-1]-net_worth[0]:+,.0f}")
+                  delta=f"${asset_curve[-1] - asset_curve[0]:+,.0f}")
+        p4.metric("Net Worth (5yr)", f"${net_worth[-1]:,.0f}",
+                  delta=f"${net_worth[-1] - net_worth[0]:+,.0f}")
 
 # ─────────────────────────────────────────────────────────────────────────────
 # VIEW 5 — AI ASSISTANT
 # ─────────────────────────────────────────────────────────────────────────────
 
 elif view == "AI Assistant":
-    page_header(
-        "AI Lending Assistant",
-        "Ask anything about clients, risk, or loan eligibility",
     page_header(
         "AI Lending Assistant",
         "Ask anything about clients, risk, or loan eligibility",
@@ -4473,13 +3984,6 @@ elif view == "AI Assistant":
         f"Quick prompts</div>",
         unsafe_allow_html=True,
     )
-    # Quick prompts
-    st.markdown(
-        f"<div style='font-size:0.7rem;font-weight:600;color:{MUTED};"
-        f"text-transform:uppercase;letter-spacing:0.07em;margin-bottom:0.6rem'>"
-        f"Quick prompts</div>",
-        unsafe_allow_html=True,
-    )
     prompts = [
         f"Is {sel['name']} eligible for a $30,000 personal loan?",
         "Which clients have the highest default risk?",
@@ -4487,13 +3991,10 @@ elif view == "AI Assistant":
         "Who has the worst debt-to-income ratio?",
     ]
     q1, q2, q3, q4 = st.columns(4)
-    q1, q2, q3, q4 = st.columns(4)
     for col, prompt in zip([q1, q2, q3, q4], prompts):
-        if col.button(prompt[:42] + "…", key=f"qp_{prompt[:20]}", use_container_width=True):
         if col.button(prompt[:42] + "…", key=f"qp_{prompt[:20]}", use_container_width=True):
             st.session_state.pending_q = prompt
 
-    st.markdown("<div style='height:4px'></div>", unsafe_allow_html=True)
     st.markdown("<div style='height:4px'></div>", unsafe_allow_html=True)
     st.divider()
 
