@@ -2838,38 +2838,51 @@ def ai_chat(system: str, user: str, model: str = OR_MODEL, max_tokens: int = 150
 # VAULT QUERY HELPERS
 # ─────────────────────────────────────────────────────────────────────────────
 
-def vault_query(question: str, n: int = 8):
-    """Search vault by keyword scoring on anonymized summaries.
-    Agents only see vault tokens + non-sensitive fields; no financial data
-    is included in their context. Actual data is resolved at the UI layer."""
+def vault_query(question: str):
+    """
+    Two-phase vault retrieval:
+    1. Find relevant customers by name match (priority) + keyword scoring.
+    2. Display their full records as cards directly in the chat (to the user).
+    3. Give the agent their non-sensitive fields so it can provide real analysis.
+
+    The agent never sees names or financial figures — but the user gets the
+    full resolved records shown right in the conversation.
+    """
     if not vault.is_loaded():
         return "⚠️ Vault not loaded.", []
 
-    q_lower = question.lower()
-    tokens  = vault.all_tokens()
+    # Phase 1 — name-match first (handles "tell me about Omar Abbas")
+    name_hits = vault.search_by_name(question)
 
-    scored = []
-    for t in tokens:
-        summary = vault.agent_summary_text(t)
-        hits = sum(1 for word in q_lower.split() if len(word) > 3 and word in summary.lower())
-        scored.append((hits, t))
-    scored.sort(key=lambda x: -x[0])
-    top_tokens = [t for _, t in scored[:n]]
+    # Phase 2 — keyword scoring on summaries for segment/goal/product questions
+    keyword_hits = vault.search_by_keyword(question, n=6)
 
-    context = "\n\n---\n\n".join(vault.agent_summary_text(t) for t in top_tokens)
+    # Merge: name hits take priority, then keyword hits, deduped
+    seen = set()
+    top_tokens = []
+    for t in name_hits + keyword_hits:
+        if t not in seen:
+            seen.add(t)
+            top_tokens.append(t)
+        if len(top_tokens) >= 8:
+            break
+
+    # Phase 3 — build agent context from non-sensitive fields only
+    context = vault.agent_context_for(top_tokens)
 
     system = (
-        "You are a senior banking advisor at Scotiabank specialising in primacy and "
-        "client engagement strategy. You have anonymized customer summaries from a secure vault. "
-        "Each customer is identified only by their vault token (e.g. 'barbara-1'). "
-        "When referencing a specific customer always write their token as [VAULT:token] "
-        "so the system can resolve the full record directly for the user. "
-        "Never invent financial figures — only use what is in the summaries provided. "
-        "Be direct and professional."
+        "You are a senior banking advisor at Scotiabank. "
+        "The user's question has been matched to customer records in the secure vault. "
+        "The customer data cards have already been displayed to the user. "
+        "Your job is to provide concise, insightful analysis of those customers "
+        "based on the summaries below — segment strategy, primacy gaps, product opportunities, "
+        "goal alignment, or engagement recommendations. "
+        "Do not repeat the raw data; focus on interpretation and advice. "
+        "Be direct, specific, and professional."
     )
-    user_msg = f"Customer summaries:\n\n{context}\n\nQuestion: {question}"
+    user_msg = f"Retrieved customer summaries:\n\n{context}\n\nAdvisor question: {question}"
 
-    with st.spinner("Analysing..."):
+    with st.spinner("Analysing…"):
         text = ai_chat(system, user_msg, model=OR_FAST_MODEL, max_tokens=1500)
 
     return text, top_tokens
@@ -4049,101 +4062,116 @@ elif view == "AI Assistant":
     st.markdown("<div style='height:4px'></div>", unsafe_allow_html=True)
     st.divider()
 
-    def render_vault_tokens(agent_text: str) -> None:
-        """Parse [VAULT:token] markers, display text with inline badges,
-        then resolve and render full customer cards directly for the user.
-        Actual financial data never flows through the agent context."""
-        token_pattern = re.compile(r"\[VAULT:([\w-]+)\]")
-        found_tokens  = token_pattern.findall(agent_text)
+    def render_customer_card(token: str) -> None:
+        """Resolve a vault token and render the full customer card to the user."""
+        record = vault.resolve(token)
+        if record is None:
+            return
+        name    = record.get("customer_name", token)
+        seg     = record.get("primary_segment", "—")
+        steps   = record.get("primacy_steps_away", "—")
+        missing = record.get("missing_primacy_steps") or "none"
+        advisor = record.get("note_advisor_name", "—")
+        goal    = record.get("goal_purpose", "—")
+        goal_st = record.get("completion_status", "—")
+        digital = record.get("digital_engagement_flag_30days", False)
+        income  = record.get("annual_income")
+        income_str = f"${income:,.0f}" if income else "—"
 
-        display_text = token_pattern.sub(lambda m: f"`{m.group(1)}`", agent_text)
-        st.markdown(display_text)
+        products = [label for field, label in [
+            ("has_open_chequing",        "Chequing"),
+            ("has_open_savings",         "Savings"),
+            ("has_open_registered_retirement_savings_account", "RRSP"),
+            ("has_open_registered_retirement_income_fund_account", "RRIF"),
+            ("has_open_registered_first_home_savings_account",    "FHSA"),
+            ("has_open_registered_disability_savings_account",    "RDSP"),
+            ("has_open_registered_education_savings_account",     "RESP"),
+            ("has_advice_plus_plan",     "Advice+"),
+            ("has_smart_investor_plan",  "Smart Investor"),
+        ] if record.get(field)]
 
-        if found_tokens:
+        seg_color = {"Primacy": SUCCESS, "Near Primacy": WARNING, "Non-Primacy": DANGER}.get(seg, MUTED)
+        dig_badge = (f"<span style='background:{SUCCESS}18;color:{SUCCESS};font-size:0.62rem;"
+                     f"font-weight:700;padding:1px 7px;border-radius:10px;border:1px solid {SUCCESS}30;"
+                     f"margin-left:6px'>Digital</span>" if digital else "")
+
+        st.markdown(
+            f"""<div style='background:{SURFACE};border:1px solid {BORDER};border-radius:14px;
+                    padding:1rem 1.25rem;margin-bottom:0.6rem;border-left:4px solid {seg_color};
+                    box-shadow:0 1px 4px rgba(0,0,0,0.05)'>
+              <div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:0.75rem'>
+                <div style='display:flex;align-items:center;gap:6px'>
+                  <span style='font-weight:700;font-size:1rem;color:{DARK}'>{name}</span>
+                  {dig_badge}
+                </div>
+                <span style='background:{seg_color}18;color:{seg_color};font-size:0.65rem;font-weight:700;
+                             padding:3px 10px;border-radius:20px;border:1px solid {seg_color}30'>{seg}</span>
+              </div>
+              <div style='display:grid;grid-template-columns:repeat(4,1fr);gap:10px;font-size:0.78rem;margin-bottom:0.6rem'>
+                <div style='background:{BG};border-radius:8px;padding:8px 10px'>
+                  <div style='color:{MUTED};font-size:0.65rem;text-transform:uppercase;
+                              letter-spacing:0.06em;margin-bottom:2px'>Annual Income</div>
+                  <div style='font-weight:700;color:{DARK}'>{income_str}</div>
+                </div>
+                <div style='background:{BG};border-radius:8px;padding:8px 10px'>
+                  <div style='color:{MUTED};font-size:0.65rem;text-transform:uppercase;
+                              letter-spacing:0.06em;margin-bottom:2px'>Primacy Steps</div>
+                  <div style='font-weight:700;color:{DARK}'>{steps} away</div>
+                </div>
+                <div style='background:{BG};border-radius:8px;padding:8px 10px'>
+                  <div style='color:{MUTED};font-size:0.65rem;text-transform:uppercase;
+                              letter-spacing:0.06em;margin-bottom:2px'>Advisor</div>
+                  <div style='font-weight:700;color:{DARK}'>{advisor}</div>
+                </div>
+                <div style='background:{BG};border-radius:8px;padding:8px 10px'>
+                  <div style='color:{MUTED};font-size:0.65rem;text-transform:uppercase;
+                              letter-spacing:0.06em;margin-bottom:2px'>Goal</div>
+                  <div style='font-weight:700;color:{DARK}'>{goal}</div>
+                  <div style='font-size:0.65rem;color:{MUTED}'>{goal_st}</div>
+                </div>
+              </div>
+              <div style='font-size:0.72rem;color:{MUTED};border-top:1px solid {BORDER};padding-top:0.5rem;margin-top:0.25rem'>
+                <b style='color:{DARK}'>Missing steps:</b> {missing} &nbsp;·&nbsp;
+                <b style='color:{DARK}'>Products:</b> {', '.join(products) or 'none'}
+              </div>
+            </div>""",
+            unsafe_allow_html=True,
+        )
+
+    def render_assistant_message(msg: dict) -> None:
+        """Render a stored assistant message: cards first, then analysis."""
+        tokens  = msg.get("vault_tokens", [])
+        content = msg.get("content", "")
+        if tokens:
             st.markdown(
-                f"<div style='font-size:0.72rem;font-weight:700;text-transform:uppercase;"
-                f"letter-spacing:0.07em;color:{MUTED};margin-top:1rem;margin-bottom:0.4rem'>"
-                f"Vault records resolved for you</div>",
+                f"<div style='font-size:0.68rem;font-weight:700;text-transform:uppercase;"
+                f"letter-spacing:0.07em;color:{MUTED};margin-bottom:0.5rem'>"
+                f"Vault records · {len(tokens)} found</div>",
                 unsafe_allow_html=True,
             )
-            for token in dict.fromkeys(found_tokens):
-                record = vault.resolve(token)
-                if record is None:
-                    st.warning(f"Token not found in vault: {token}")
-                    continue
-                name    = record.get("customer_name", token)
-                seg     = record.get("primary_segment", "—")
-                steps   = record.get("primacy_steps_away", "—")
-                missing = record.get("missing_primacy_steps", "none")
-                advisor = record.get("note_advisor_name", "—")
-                goal    = record.get("goal_purpose", "—")
-                goal_st = record.get("completion_status", "—")
-                income  = record.get("annual_income")
-                income_str = f"${income:,.0f}" if income else "—"
-
-                products = []
-                for field, label in [
-                    ("has_open_chequing",        "Chequing"),
-                    ("has_open_savings",         "Savings"),
-                    ("has_open_registered_retirement_savings_account", "RRSP"),
-                    ("has_open_registered_retirement_income_fund_account", "RRIF"),
-                    ("has_open_registered_first_home_savings_account",    "FHSA"),
-                    ("has_open_registered_disability_savings_account",    "RDSP"),
-                    ("has_open_registered_education_savings_account",     "RESP"),
-                    ("has_advice_plus_plan",     "Advice+"),
-                    ("has_smart_investor_plan",  "Smart Investor"),
-                ]:
-                    if record.get(field):
-                        products.append(label)
-
-                seg_color = {
-                    "Primacy": SUCCESS, "Near Primacy": WARNING, "Non-Primacy": DANGER
-                }.get(seg, MUTED)
-
+            for t in tokens:
+                render_customer_card(t)
+            if content:
                 st.markdown(
-                    f"""<div style='background:{SURFACE};border:1px solid {BORDER};
-                            border-radius:14px;padding:1rem 1.25rem;margin-bottom:0.75rem;
-                            border-left:4px solid {seg_color}'>
-                      <div style='display:flex;justify-content:space-between;align-items:center;
-                                  margin-bottom:0.6rem'>
-                        <div>
-                          <span style='font-weight:700;font-size:0.95rem;color:{DARK}'>{name}</span>
-                          <span style='font-size:0.7rem;color:{MUTED};margin-left:8px'>
-                            vault: <code>{token}</code></span>
-                        </div>
-                        <span style='background:{seg_color}18;color:{seg_color};font-size:0.65rem;
-                                     font-weight:700;padding:2px 10px;border-radius:20px;
-                                     border:1px solid {seg_color}30'>{seg}</span>
-                      </div>
-                      <div style='display:grid;grid-template-columns:repeat(4,1fr);gap:8px;
-                                  font-size:0.75rem'>
-                        <div><span style='color:{MUTED}'>Annual income</span><br>
-                             <b>{income_str}</b></div>
-                        <div><span style='color:{MUTED}'>Steps to primacy</span><br>
-                             <b>{steps}</b></div>
-                        <div><span style='color:{MUTED}'>Advisor</span><br>
-                             <b>{advisor}</b></div>
-                        <div><span style='color:{MUTED}'>Goal</span><br>
-                             <b>{goal} ({goal_st})</b></div>
-                      </div>
-                      <div style='margin-top:0.6rem;font-size:0.72rem;color:{MUTED}'>
-                        <b>Missing steps:</b> {missing or "none"} &nbsp;·&nbsp;
-                        <b>Products:</b> {', '.join(products) or 'none'}
-                      </div>
-                    </div>""",
+                    f"<div style='font-size:0.68rem;font-weight:700;text-transform:uppercase;"
+                    f"letter-spacing:0.07em;color:{MUTED};margin-top:0.8rem;margin-bottom:0.4rem'>"
+                    f"Analysis</div>",
                     unsafe_allow_html=True,
                 )
+        if content:
+            st.markdown(content)
 
-    def ask_vault(question: str) -> str:
-        answer, _ = vault_query(question)
-        return answer
+    def run_vault_query(question: str) -> dict:
+        """Execute query, render cards immediately, return message dict for history."""
+        answer, tokens = vault_query(question)
+        return {"role": "assistant", "content": answer, "vault_tokens": tokens}
 
     # Chat history
     for msg in st.session_state.chat:
         avatar = "👤" if msg["role"] == "user" else "🤖"
         with st.chat_message(msg["role"], avatar=avatar):
             if msg["role"] == "assistant":
-                render_vault_tokens(msg["content"])
+                render_assistant_message(msg)
             else:
                 st.markdown(msg["content"])
 
@@ -4155,9 +4183,9 @@ elif view == "AI Assistant":
         with st.chat_message("user", avatar="👤"):
             st.markdown(question)
         with st.chat_message("assistant", avatar="🤖"):
-            answer = ask_vault(question)
-            render_vault_tokens(answer)
-        st.session_state.chat.append({"role": "assistant", "content": answer})
+            result = run_vault_query(question)
+            render_assistant_message(result)
+        st.session_state.chat.append(result)
 
     # Typed input
     user_input = st.chat_input("Ask about any client, segment, or engagement strategy…")
@@ -4166,9 +4194,9 @@ elif view == "AI Assistant":
         with st.chat_message("user", avatar="👤"):
             st.markdown(user_input)
         with st.chat_message("assistant", avatar="🤖"):
-            answer = ask_vault(user_input)
-            render_vault_tokens(answer)
-        st.session_state.chat.append({"role": "assistant", "content": answer})
+            result = run_vault_query(user_input)
+            render_assistant_message(result)
+        st.session_state.chat.append(result)
 
     if st.session_state.chat:
         if st.button("🗑️ Clear conversation", type="secondary"):

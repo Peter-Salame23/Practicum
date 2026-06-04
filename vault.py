@@ -213,5 +213,45 @@ def search_tokens(query: str) -> list[str]:
     return [t for t in _vault if q in t]
 
 
+def search_by_name(query: str) -> list[str]:
+    """Case-insensitive partial name match. Returns matching tokens."""
+    q = query.strip().lower()
+    if not q:
+        return []
+    results = []
+    for token, row in _vault.items():
+        name = str(row.get("customer_name", "")).lower()
+        # Match if full query OR any meaningful word matches
+        if q in name or any(w in name for w in q.split() if len(w) > 2):
+            results.append(token)
+    return results
+
+
+def search_by_keyword(question: str, n: int = 8) -> list[str]:
+    """Score tokens by how many question words appear in their summary text."""
+    q_words = [w for w in question.lower().split() if len(w) > 3]
+    if not q_words:
+        return list(_vault.keys())[:n]
+    scored = []
+    for t in _vault:
+        summary = agent_summary_text(t)
+        hits = sum(1 for w in q_words if w in summary.lower())
+        scored.append((hits, t))
+    scored.sort(key=lambda x: -x[0])
+    return [t for _, t in scored[:n]]
+
+
+def agent_context_for(tokens: list[str]) -> str:
+    """Build agent-safe context string for a list of tokens.
+    Includes non-restricted fields so the agent can provide real analysis."""
+    parts = []
+    for t in tokens:
+        view = agent_view(t)
+        if not view:
+            continue
+        parts.append(agent_summary_text(t))
+    return "\n\n---\n\n".join(parts)
+
+
 def is_loaded() -> bool:
     return bool(_vault)
