@@ -113,6 +113,8 @@ def seeded_choice(customer_id: str, salt: str, options: list[str]) -> str:
 def is_missing(value: Any) -> bool:
     if value is None:
         return True
+    if isinstance(value, float) and value != value:  # NaN check (pandas empty cells)
+        return True
     if isinstance(value, str) and not value.strip():
         return True
     return False
@@ -157,6 +159,17 @@ def parse_bool(value: Any) -> bool | None:
     return None
 
 
+def _parse_date_str(text: str) -> str | None:
+    """Parse common date string formats (M/D/YYYY, YYYY-MM-DD, etc.) into ISO format."""
+    text = text.strip()
+    for fmt in ("%m/%d/%Y", "%m/%d/%y", "%Y-%m-%d", "%d/%m/%Y", "%d-%m-%Y"):
+        try:
+            return datetime.strptime(text, fmt).date().isoformat()
+        except ValueError:
+            continue
+    return text or None
+
+
 def iso_date(value: Any) -> str | None:
     if is_missing(value):
         return None
@@ -164,7 +177,9 @@ def iso_date(value: Any) -> str | None:
         return value.date().isoformat()
     if isinstance(value, date):
         return value.isoformat()
-    return clean_text(value) or None
+    if isinstance(value, str):
+        return _parse_date_str(value)
+    return None
 
 
 def clean_cell(column: str, value: Any) -> Any:
@@ -175,6 +190,11 @@ def clean_cell(column: str, value: Any) -> Any:
         return value.date().isoformat()
     if isinstance(value, date):
         return value.isoformat()
+    if isinstance(value, str) and any(c in value for c in ("/"," -")):
+        # Try to parse date-like strings that came from CSV
+        parsed = _parse_date_str(value)
+        if parsed and parsed != value:
+            return parsed
     if isinstance(value, time):
         return value.isoformat()
     if isinstance(value, bool):

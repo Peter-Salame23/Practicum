@@ -9,6 +9,7 @@ import re
 import hashlib
 from html import escape
 from datetime import datetime, date, timedelta
+from pathlib import Path
 
 from dotenv import load_dotenv
 from openai import OpenAI
@@ -21,11 +22,10 @@ import vault
 
 load_dotenv("data/.env")
 OPENROUTER_KEY = os.environ.get("OpenrouterApiKey", "").strip().strip("'\"")
-CUSTOMERS_JSON_PATH = os.environ.get("CustomersJsonPath", "data/customers.json").strip().strip("'\"")
-
-# Vault data source — prefers xlsx, falls back to csv
-_VAULT_XLSX = "MMA - Practicum Synthetic Data.xlsx"
-_VAULT_CSV  = "MMA - Practicum Synthetic Data(Synethic_Data).csv"
+# MMA data sources — prefers xlsx (Cathy's format), falls back to csv (Peter's format)
+_VAULT_XLSX     = "MMA - Practicum Synthetic Data.xlsx"
+_VAULT_CSV      = "MMA - Practicum Synthetic Data(Synethic_Data).csv"
+_CUSTOMERS_JSON = "data/customers.json"    # auto-generated cache, not a manual data source
 
 
 def stable_seed_from_customer_id(customer_id):
@@ -560,21 +560,46 @@ st.markdown(f"""
 
 @st.cache_data
 def load_customers():
-    if not os.path.exists(CUSTOMERS_JSON_PATH):
-        st.error(f"Customer data not found at `{CUSTOMERS_JSON_PATH}`. Run `python transform_mma_to_customers.py` first.")
+    """Load customers from the MMA data. Uses a cached JSON if present;
+    otherwise auto-builds it from xlsx or csv — no manual step required."""
+    from transform_mma_to_customers import load_excel_rows, convert_row
+
+    # Return cached JSON if it exists (speeds up restarts)
+    if os.path.exists(_CUSTOMERS_JSON):
+        with open(_CUSTOMERS_JSON, encoding="utf-8") as f:
+            return json.load(f)
+
+    # Build from MMA source data
+    if os.path.exists(_VAULT_XLSX):
+        with st.spinner("First run: building customer data from MMA xlsx…"):
+            rows, _ = load_excel_rows(Path(_VAULT_XLSX), "synthetic_data", limit=None)
+    elif os.path.exists(_VAULT_CSV):
+        with st.spinner("First run: building customer data from MMA csv…"):
+            import pandas as _pd
+            df_raw = _pd.read_csv(_VAULT_CSV, encoding="latin-1")
+            rows = df_raw.to_dict(orient="records")
+    else:
+        st.error("MMA data not found. Place the xlsx or csv in the project root.")
         st.stop()
-    with open(CUSTOMERS_JSON_PATH) as f:
-        return json.load(f)
+
+    customers = [convert_row(r) for r in rows]
+
+    # Cache to disk for future runs
+    Path(_CUSTOMERS_JSON).parent.mkdir(parents=True, exist_ok=True)
+    with open(_CUSTOMERS_JSON, "w", encoding="utf-8") as f:
+        json.dump(customers, f, indent=2, ensure_ascii=False)
+
+    return customers
 
 @st.cache_resource
 def load_vault():
-    """Load vault from xlsx (Cathy's format) or csv (Peter's format), whichever exists."""
+    """Load vault from xlsx or csv, whichever exists."""
     if os.path.exists(_VAULT_XLSX):
         vault.load(_VAULT_XLSX)
     elif os.path.exists(_VAULT_CSV):
         vault.load(_VAULT_CSV)
     else:
-        st.warning("Vault data not found — AI Assistant will use customers.json only.")
+        st.warning("MMA data not found — AI Assistant unavailable.")
 
 customers  = load_customers()
 load_vault()
