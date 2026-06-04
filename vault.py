@@ -6,6 +6,7 @@ non-sensitive fields. Actual financial data, account IDs, and PII are
 resolved only at the UI layer, never flowing through agent context.
 """
 
+import os
 import re
 import unicodedata
 import pandas as pd
@@ -96,9 +97,22 @@ def _slugify(text: str) -> str:
 
 # ── public API ─────────────────────────────────────────────────────────────────
 
-def load(csv_path: str) -> None:
-    """Load CSV into vault. Must be called once at startup."""
-    df = pd.read_csv(csv_path, encoding="latin-1")
+def load(path: str) -> None:
+    """Load CSV or xlsx into vault. Must be called once at startup.
+    Accepts .xlsx (Cathy's format) or .csv (Peter's format)."""
+    ext = os.path.splitext(path)[1].lower()
+    if ext in (".xlsx", ".xls"):
+        # Try the sheet name used in the MMA workbook
+        for sheet in ("synthetic_data", "Synethic_Data", "Synthetic_Data", 0):
+            try:
+                df = pd.read_excel(path, sheet_name=sheet)
+                break
+            except Exception:
+                continue
+        else:
+            raise ValueError(f"Could not find a readable sheet in {path}")
+    else:
+        df = pd.read_csv(path, encoding="latin-1")
 
     name_count: dict[str, int] = {}
 
