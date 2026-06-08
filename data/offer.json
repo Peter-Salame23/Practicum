@@ -1,0 +1,613 @@
+[
+  {
+    "benefit_id": "BASIC_BANKING_LOW_COST_ACCOUNT",
+    "product_category": "chequing",
+    "product_name": "Basic Banking Account",
+    "customer_benefit": "Low-cost basic chequing account for clients with minimal day-to-day banking needs, including a limited number of included debit or Interac e-Transfer transactions.",
+    "client_signal": [
+      "low_transaction_volume",
+      "cost_sensitive_client",
+      "basic_banking_needs",
+      "limited_monthly_debit_activity"
+    ],
+    "model_use": "Recommend reviewing whether the client may benefit from a lower-cost basic account instead of a higher-fee package.",
+    "source_doc": "Day-to-Day Banking Companion Booklet",
+    "source_page": 16
+  },
+  {
+    "benefit_id": "BASIC_PLUS_TRANSACTION_ALLOWANCE",
+    "product_category": "chequing",
+    "product_name": "Basic Plus Bank Account",
+    "customer_benefit": "Provides more included debit or Interac e-Transfer transactions than the Basic Banking Account while remaining below premium package pricing.",
+    "client_signal": [
+      "moderate_transaction_volume",
+      "uses_debit_card_regularly",
+      "uses_interac_etransfer",
+      "cost_sensitive_client"
+    ],
+    "model_use": "Flag clients who exceed Basic Banking activity but may not need unlimited transactions.",
+    "source_doc": "Day-to-Day Banking Companion Booklet",
+    "source_page": 16
+  },
+  {
+    "benefit_id": "PREFERRED_PACKAGE_UNLIMITED_TRANSACTIONS",
+    "product_category": "chequing_package",
+    "product_name": "Preferred Package",
+    "customer_benefit": "Unlimited debit transactions and Interac e-Transfer transactions for everyday banking needs.",
+    "client_signal": [
+      "high_transaction_volume",
+      "frequent_debit_card_usage",
+      "frequent_interac_etransfer_usage",
+      "monthly_transaction_fees_detected"
+    ],
+    "model_use": "Recommend reviewing Preferred Package suitability for clients with high monthly transaction activity.",
+    "source_doc": "Day-to-Day Banking Companion Booklet",
+    "source_page": 16
+  },
+  {
+    "benefit_id": "ULTIMATE_PACKAGE_PREMIUM_BUNDLE",
+    "product_category": "chequing_package",
+    "product_name": "Ultimate Package",
+    "customer_benefit": "Premium bundled package with unlimited transactions, selected ABM benefits, credit card annual fee rebate, MomentumPLUS interest rate boost, and other bundled banking benefits.",
+    "client_signal": [
+      "high_transaction_volume",
+      "multi_product_client",
+      "high_deposit_balance",
+      "uses_credit_card",
+      "uses_savings_account",
+      "uses_international_money_transfer",
+      "uses_non_scotiabank_abm"
+    ],
+    "model_use": "Flag high-value or multi-product clients who may benefit from bundled premium banking features.",
+    "source_doc": "Day-to-Day Banking Companion Booklet",
+    "source_page": 16
+  },
+  {
+    "benefit_id": "MONTHLY_FEE_WAIVER_BASIC_PLUS",
+    "product_category": "chequing",
+    "product_name": "Basic Plus Bank Account",
+    "customer_benefit": "Monthly account fee may be waived if the client maintains the required minimum daily closing balance for the full statement period.",
+    "client_signal": [
+      "stable_monthly_balance",
+      "balance_above_3000",
+      "existing_basic_plus_client",
+      "fee_charged_recently"
+    ],
+    "model_use": "Recommend checking whether the client can maintain the required balance to avoid monthly account fees.",
+    "source_doc": "Day-to-Day Banking Companion Booklet",
+    "source_page": 17
+  },
+  {
+    "benefit_id": "MONTHLY_FEE_WAIVER_PREFERRED",
+    "product_category": "chequing_package",
+    "product_name": "Preferred Package",
+    "customer_benefit": "Monthly account fee may be waived if the client maintains the required minimum daily closing balance for the full statement period.",
+    "client_signal": [
+      "stable_monthly_balance",
+      "balance_above_4000",
+      "existing_preferred_package_client",
+      "fee_charged_recently"
+    ],
+    "model_use": "Flag clients who may already qualify, or could qualify, for a Preferred Package fee waiver through balance maintenance.",
+    "source_doc": "Day-to-Day Banking Companion Booklet",
+    "source_page": 17
+  },
+  {
+    "benefit_id": "MONTHLY_FEE_WAIVER_ULTIMATE",
+    "product_category": "chequing_package",
+    "product_name": "Ultimate Package",
+    "customer_benefit": "Monthly account fee may be waived or rebated when the client maintains the required balance in the Ultimate Package or eligible combined balance with MomentumPLUS Savings.",
+    "client_signal": [
+      "balance_above_6000",
+      "combined_balance_above_30000",
+      "has_momentumplus_savings",
+      "high_deposit_balance",
+      "existing_ultimate_package_client"
+    ],
+    "model_use": "Recommend checking whether the client can structure balances to reduce or eliminate Ultimate Package monthly fees.",
+    "source_doc": "Day-to-Day Banking Companion Booklet",
+    "source_page": 17
+  },
+  {
+    "benefit_id": "SENIOR_ACCOUNT_DISCOUNT",
+    "product_category": "banking_package",
+    "product_name": "Basic Banking / Basic Plus / Preferred / Ultimate / selected savings accounts",
+    "customer_benefit": "Clients aged 60 or older may receive a monthly account fee discount on eligible accounts.",
+    "client_signal": [
+      "age_60_plus",
+      "monthly_account_fee_charged",
+      "eligible_chequing_or_savings_account",
+      "retirement_income",
+      "pension_deposit"
+    ],
+    "model_use": "Flag senior clients for advisor review if an eligible account fee discount may apply.",
+    "source_doc": "Day-to-Day Banking Companion Booklet",
+    "source_page": 26
+  },
+  {
+    "benefit_id": "RDSP_BASIC_ACCOUNT_FEE_WAIVER",
+    "product_category": "chequing",
+    "product_name": "Basic Banking Account",
+    "customer_benefit": "RDSP beneficiaries may be eligible to have the Basic Banking Account monthly fee waived after providing required proof.",
+    "client_signal": [
+      "rdsp_beneficiary",
+      "has_rdsp_relationship",
+      "basic_banking_account",
+      "monthly_account_fee_charged"
+    ],
+    "model_use": "Flag possible Basic Banking Account fee waiver opportunity for advisor verification.",
+    "source_doc": "Day-to-Day Banking Companion Booklet",
+    "source_page": 24
+  },
+  {
+    "benefit_id": "STUDENT_YOUTH_PREFERRED_PACKAGE",
+    "product_category": "student_banking",
+    "product_name": "Preferred Package for Students and Youth",
+    "customer_benefit": "Eligible youth clients and full-time students may receive the Preferred Package for Students and Youth with free monthly account fee and unlimited included debit transactions.",
+    "client_signal": [
+      "age_under_23",
+      "student_status",
+      "tuition_payment",
+      "education_related_transactions",
+      "full_time_student",
+      "young_client"
+    ],
+    "model_use": "Recommend checking student/youth package eligibility for young or student clients.",
+    "source_doc": "Day-to-Day Banking Companion Booklet",
+    "source_page": 25
+  },
+  {
+    "benefit_id": "STUDENT_FREE_RECORDKEEPING",
+    "product_category": "student_banking",
+    "product_name": "Preferred Package for Students and Youth",
+    "customer_benefit": "Student/youth package includes free paperless, paper statement, and paper statement with cheque image return options.",
+    "client_signal": [
+      "student_status",
+      "uses_paper_statement",
+      "paper_statement_fee_detected",
+      "young_client"
+    ],
+    "model_use": "Flag student/youth clients who may benefit from free recordkeeping options.",
+    "source_doc": "Day-to-Day Banking Companion Booklet",
+    "source_page": 28
+  },
+  {
+    "benefit_id": "FREE_INTERAC_ETRANSFER",
+    "product_category": "day_to_day_banking",
+    "product_name": "Eligible chequing packages",
+    "customer_benefit": "Interac e-Transfer transactions are free for eligible day-to-day banking packages, though they may still count toward included debit transaction limits for some accounts.",
+    "client_signal": [
+      "frequent_interac_etransfer_usage",
+      "etransfer_fees_detected",
+      "high_digital_payment_usage"
+    ],
+    "model_use": "Recommend a package review for clients who frequently send Interac e-Transfers or incur related transaction fees.",
+    "source_doc": "Day-to-Day Banking Companion Booklet",
+    "source_page": 17
+  },
+  {
+    "benefit_id": "ULTIMATE_NO_IMT_TRANSACTION_FEE",
+    "product_category": "international_payments",
+    "product_name": "Ultimate Package",
+    "customer_benefit": "Ultimate Package includes no transaction fee for International Money Transfers.",
+    "client_signal": [
+      "uses_international_money_transfer",
+      "frequent_cross_border_payments",
+      "family_support_transfers",
+      "newcomer_client",
+      "international_student"
+    ],
+    "model_use": "Flag clients with international transfer activity for potential Ultimate Package benefit review.",
+    "source_doc": "Day-to-Day Banking Companion Booklet",
+    "source_page": 18
+  },
+  {
+    "benefit_id": "PREFERRED_NON_SCOTIABANK_ABM_BENEFIT",
+    "product_category": "abm_access",
+    "product_name": "Preferred Package",
+    "customer_benefit": "Preferred Package includes one free non-Scotiabank Interac ABM cash withdrawal in Canada per month.",
+    "client_signal": [
+      "non_scotiabank_abm_fees",
+      "uses_external_abm",
+      "cash_withdrawal_activity",
+      "monthly_abm_fees_detected"
+    ],
+    "model_use": "Recommend reviewing Preferred Package if the client occasionally uses non-Scotiabank ABMs.",
+    "source_doc": "Day-to-Day Banking Companion Booklet",
+    "source_page": 18
+  },
+  {
+    "benefit_id": "ULTIMATE_UNLIMITED_GLOBAL_ABM_WITHDRAWALS",
+    "product_category": "abm_access",
+    "product_name": "Ultimate Package",
+    "customer_benefit": "Ultimate Package includes unlimited Scotiabank access-fee waivers for eligible non-Scotiabank ABM withdrawals in Canada and internationally.",
+    "client_signal": [
+      "frequent_non_scotiabank_abm_usage",
+      "travel_transactions",
+      "foreign_cash_withdrawals",
+      "abm_fees_detected",
+      "international_client"
+    ],
+    "model_use": "Flag clients with frequent ABM access fees or travel-related withdrawals for Ultimate Package review.",
+    "source_doc": "Day-to-Day Banking Companion Booklet",
+    "source_page": 18
+  },
+  {
+    "benefit_id": "ULTIMATE_OVERDRAFT_PROTECTION_FEE_WAIVER",
+    "product_category": "overdraft",
+    "product_name": "Ultimate Package",
+    "customer_benefit": "Ultimate Package account holders who add overdraft protection may have overdraft protection fees waived, subject to approval; interest on overdrawn balances still applies.",
+    "client_signal": [
+      "overdraft_usage",
+      "overdraft_protection_fee_detected",
+      "cash_flow_volatility",
+      "short_term_negative_balance",
+      "existing_ultimate_package_client"
+    ],
+    "model_use": "Flag clients with overdraft protection fees for advisor review of Ultimate Package benefits and suitability.",
+    "source_doc": "Day-to-Day Banking Companion Booklet",
+    "source_page": 18
+  },
+  {
+    "benefit_id": "ULTIMATE_FREE_PERSONALIZED_CHEQUES",
+    "product_category": "cheque_services",
+    "product_name": "Ultimate Package",
+    "customer_benefit": "Ultimate Package may include one book of personalized cheques per year for an account in good standing.",
+    "client_signal": [
+      "cheque_order_fee_detected",
+      "uses_cheques",
+      "existing_ultimate_package_client",
+      "small_business_like_payment_pattern"
+    ],
+    "model_use": "Flag clients who order cheques and may benefit from Ultimate Package cheque benefits.",
+    "source_doc": "Day-to-Day Banking Companion Booklet",
+    "source_page": 18
+  },
+  {
+    "benefit_id": "ULTIMATE_FREE_DRAFTS",
+    "product_category": "draft_services",
+    "product_name": "Ultimate Package",
+    "customer_benefit": "Ultimate Package may include free Canadian and U.S. dollar drafts for accounts in good standing.",
+    "client_signal": [
+      "bank_draft_fee_detected",
+      "uses_bank_drafts",
+      "large_payment_activity",
+      "real_estate_payment_pattern",
+      "existing_ultimate_package_client"
+    ],
+    "model_use": "Flag clients who frequently purchase drafts for potential Ultimate Package benefit review.",
+    "source_doc": "Day-to-Day Banking Companion Booklet",
+    "source_page": 18
+  },
+  {
+    "benefit_id": "PREFERRED_CREDIT_CARD_FIRST_YEAR_REBATE",
+    "product_category": "credit_card_bundle",
+    "product_name": "Preferred Package",
+    "customer_benefit": "Preferred Package may provide a first-year annual fee rebate on one newly opened eligible Scotiabank credit card.",
+    "client_signal": [
+      "new_preferred_package_client",
+      "no_scotiabank_credit_card",
+      "eligible_credit_card_interest",
+      "high_card_spend_potential",
+      "travel_or_cashback_spend_pattern"
+    ],
+    "model_use": "Recommend an advisor review for clients who may benefit from opening an eligible credit card with a first-year fee rebate.",
+    "source_doc": "Day-to-Day Banking Companion Booklet",
+    "source_page": 21
+  },
+  {
+    "benefit_id": "ULTIMATE_CREDIT_CARD_ANNUAL_FEE_REBATE",
+    "product_category": "credit_card_bundle",
+    "product_name": "Ultimate Package",
+    "customer_benefit": "Ultimate Package may provide an annual fee rebate of up to $150 each year on one eligible Scotiabank credit card, while account and card remain open and in good standing.",
+    "client_signal": [
+      "existing_ultimate_package_client",
+      "has_eligible_scotiabank_credit_card",
+      "credit_card_annual_fee_charged",
+      "premium_credit_card_user",
+      "high_card_spend"
+    ],
+    "model_use": "Flag Ultimate Package clients with eligible card annual fees for rebate validation.",
+    "source_doc": "Day-to-Day Banking Companion Booklet",
+    "source_page": 21
+  },
+  {
+    "benefit_id": "MOMENTUMPLUS_INTEREST_RATE_BOOST",
+    "product_category": "savings_bundle",
+    "product_name": "Preferred Package / Ultimate Package + MomentumPLUS Savings",
+    "customer_benefit": "Preferred and Ultimate Package clients may receive an additional interest rate boost on MomentumPLUS Savings Account balances.",
+    "client_signal": [
+      "has_momentumplus_savings",
+      "high_savings_balance",
+      "idle_cash_balance",
+      "existing_preferred_package_client",
+      "existing_ultimate_package_client"
+    ],
+    "model_use": "Recommend checking whether the client can improve savings return through package-linked MomentumPLUS rate boost.",
+    "source_doc": "Day-to-Day Banking Companion Booklet",
+    "source_page": 21
+  },
+  {
+    "benefit_id": "PREFERRED_GIC_RATE",
+    "product_category": "gic_bundle",
+    "product_name": "Preferred Package",
+    "customer_benefit": "Preferred Package clients may receive Preferred Package GIC rates on eligible long-term non-redeemable GICs.",
+    "client_signal": [
+      "gic_interest",
+      "maturing_gic",
+      "large_term_deposit_balance",
+      "conservative_investment_profile",
+      "existing_preferred_package_client"
+    ],
+    "model_use": "Flag clients with GIC needs for advisor review of Preferred Package GIC rate eligibility.",
+    "source_doc": "Day-to-Day Banking Companion Booklet",
+    "source_page": 22
+  },
+  {
+    "benefit_id": "ULTIMATE_GIC_RATE",
+    "product_category": "gic_bundle",
+    "product_name": "Ultimate Package",
+    "customer_benefit": "Ultimate Package clients may receive Ultimate Package GIC rates on eligible long-term non-redeemable GICs.",
+    "client_signal": [
+      "gic_interest",
+      "maturing_gic",
+      "large_term_deposit_balance",
+      "conservative_investment_profile",
+      "existing_ultimate_package_client"
+    ],
+    "model_use": "Flag Ultimate Package clients with GIC balances or upcoming maturities for rate-benefit review.",
+    "source_doc": "Day-to-Day Banking Companion Booklet",
+    "source_page": 22
+  },
+  {
+    "benefit_id": "USD_DAILY_INTEREST_ACCOUNT_FEE_WAIVER",
+    "product_category": "foreign_currency_account",
+    "product_name": "Scotia U.S. Dollar Daily Interest Account",
+    "customer_benefit": "Preferred, Ultimate, and Student/Youth Preferred Package clients may qualify for a monthly account fee waiver on one Scotia U.S. Dollar Daily Interest Account.",
+    "client_signal": [
+      "usd_transactions",
+      "travel_to_us",
+      "receives_usd_payments",
+      "foreign_currency_need",
+      "existing_preferred_or_ultimate_package_client",
+      "student_status"
+    ],
+    "model_use": "Recommend U.S. dollar account fee-waiver review for clients with USD activity.",
+    "source_doc": "Day-to-Day Banking Companion Booklet",
+    "source_page": 22
+  },
+  {
+    "benefit_id": "ULTIMATE_ADDITIONAL_BASIC_PLUS_FEE_WAIVER",
+    "product_category": "chequing_bundle",
+    "product_name": "Ultimate Package + Basic Plus Bank Account",
+    "customer_benefit": "Ultimate Package primary account holder may qualify for a monthly fee waiver on one additional Basic Plus Bank Account.",
+    "client_signal": [
+      "existing_ultimate_package_client",
+      "multiple_chequing_accounts",
+      "household_banking_need",
+      "additional_basic_plus_account",
+      "basic_plus_fee_charged"
+    ],
+    "model_use": "Flag clients with multiple accounts for potential bundled fee-waiver review.",
+    "source_doc": "Day-to-Day Banking Companion Booklet",
+    "source_page": 22
+  },
+  {
+    "benefit_id": "ULTIMATE_SAFETY_DEPOSIT_BOX_WAIVER",
+    "product_category": "safety_deposit_box",
+    "product_name": "Ultimate Package",
+    "customer_benefit": "Ultimate Package may include a safety deposit box annual fee waiver up to the value of a small box, subject to availability and eligibility.",
+    "client_signal": [
+      "safety_deposit_box_fee_detected",
+      "existing_ultimate_package_client",
+      "high_value_client",
+      "branch_service_usage"
+    ],
+    "model_use": "Flag Ultimate Package clients with safety deposit box usage for fee-waiver validation.",
+    "source_doc": "Day-to-Day Banking Companion Booklet",
+    "source_page": 22
+  },
+  {
+    "benefit_id": "PREFERRED_ITRADE_BOGO_TRADES",
+    "product_category": "investment_bundle",
+    "product_name": "Preferred Package + Scotia iTRADE",
+    "customer_benefit": "Preferred Package clients may receive buy-one-get-one-free eligible Scotia iTRADE mobile app trades, subject to limits and eligibility.",
+    "client_signal": [
+      "has_scotia_itrade",
+      "self_directed_investor",
+      "frequent_trading_activity",
+      "existing_preferred_package_client",
+      "uses_mobile_trading"
+    ],
+    "model_use": "Flag Preferred Package clients with self-directed investing activity for iTRADE benefit review.",
+    "source_doc": "Day-to-Day Banking Companion Booklet",
+    "source_page": 23
+  },
+  {
+    "benefit_id": "STUDENT_ITRADE_FREE_TRADES",
+    "product_category": "student_investing",
+    "product_name": "Preferred Package for Students and Youth + Scotia iTRADE",
+    "customer_benefit": "Eligible Student and Youth package clients may receive commission waivers on eligible Scotia iTRADE trades, subject to limits and eligibility.",
+    "client_signal": [
+      "student_status",
+      "young_client",
+      "has_scotia_itrade",
+      "self_directed_investor",
+      "trading_commission_detected"
+    ],
+    "model_use": "Flag student/youth clients with investing activity for iTRADE benefit review.",
+    "source_doc": "Day-to-Day Banking Companion Booklet",
+    "source_page": 28
+  },
+  {
+    "benefit_id": "SCENE_PLUS_BANKING_ELIGIBILITY",
+    "product_category": "rewards",
+    "product_name": "Preferred Package / Ultimate Package / Student and Youth Package",
+    "customer_benefit": "Eligible packages may participate in the Scene+ program.",
+    "client_signal": [
+      "rewards_interest",
+      "frequent_debit_usage",
+      "student_status",
+      "existing_preferred_package_client",
+      "existing_ultimate_package_client"
+    ],
+    "model_use": "Flag clients who may value rewards-linked banking benefits.",
+    "source_doc": "Day-to-Day Banking Companion Booklet",
+    "source_page": 19
+  },
+  {
+    "benefit_id": "BANK_THE_REST_SAVINGS_PROGRAM",
+    "product_category": "savings_tool",
+    "product_name": "Bank The Rest Savings Program",
+    "customer_benefit": "Bank The Rest Savings Program is available free across listed day-to-day banking packages and can support automatic savings behavior.",
+    "client_signal": [
+      "low_savings_balance",
+      "frequent_debit_card_usage",
+      "savings_goal",
+      "needs_automatic_savings",
+      "round_up_savings_opportunity"
+    ],
+    "model_use": "Recommend automatic savings feature for clients with frequent spending and low savings accumulation.",
+    "source_doc": "Day-to-Day Banking Companion Booklet",
+    "source_page": 19
+  },
+  {
+    "benefit_id": "MOBILE_CHEQUE_DEPOSIT_FREE",
+    "product_category": "digital_banking",
+    "product_name": "Mobile Cheque Deposit",
+    "customer_benefit": "Mobile cheque deposit is listed as free across day-to-day banking packages.",
+    "client_signal": [
+      "cheque_deposit_activity",
+      "branch_cheque_deposit_usage",
+      "digital_banking_user",
+      "mobile_app_user"
+    ],
+    "model_use": "Flag clients who deposit cheques in branch and may benefit from mobile cheque deposit education.",
+    "source_doc": "Day-to-Day Banking Companion Booklet",
+    "source_page": 19
+  },
+  {
+    "benefit_id": "SCOTIA_INFOALERTS_FREE",
+    "product_category": "digital_banking",
+    "product_name": "Scotia InfoAlerts",
+    "customer_benefit": "Scotia InfoAlerts are listed as free across day-to-day banking packages.",
+    "client_signal": [
+      "low_balance_events",
+      "overdraft_risk",
+      "fraud_risk_flag",
+      "digital_banking_user",
+      "needs_account_monitoring"
+    ],
+    "model_use": "Recommend account-alert education for clients with overdraft risk, low-balance events, or fraud-prevention needs.",
+    "source_doc": "Day-to-Day Banking Companion Booklet",
+    "source_page": 19
+  },
+  {
+    "benefit_id": "OPEN_TRANSIT_DEBIT_FREE",
+    "product_category": "transit_payments",
+    "product_name": "Open Transit Debit",
+    "customer_benefit": "Open transit debit transactions are free and do not count against the allotted number of free debit transactions for eligible account types.",
+    "client_signal": [
+      "transit_spend",
+      "commuter_client",
+      "frequent_small_debit_transactions",
+      "urban_client",
+      "student_status"
+    ],
+    "model_use": "Flag clients with transit spending for debit-card transit payment benefit education.",
+    "source_doc": "Day-to-Day Banking Companion Booklet",
+    "source_page": 23
+  },
+  {
+    "benefit_id": "MONEY_MASTER_NO_MONTHLY_FEE",
+    "product_category": "savings",
+    "product_name": "Money Master Savings Account",
+    "customer_benefit": "Money Master Savings Account has no monthly fee and pays interest on the entire balance, with rates based on balance tier.",
+    "client_signal": [
+      "idle_cash_balance",
+      "needs_basic_savings_account",
+      "low_risk_savings_need",
+      "no_existing_savings_account"
+    ],
+    "model_use": "Recommend reviewing a basic savings account option for clients holding idle cash in chequing.",
+    "source_doc": "Day-to-Day Banking Companion Booklet",
+    "source_page": 34
+  },
+  {
+    "benefit_id": "MONEY_MASTER_UNLIMITED_SCOTIABANK_TRANSFERS",
+    "product_category": "savings",
+    "product_name": "Money Master Savings Account",
+    "customer_benefit": "Money Master Savings Account allows unlimited no-fee transfers to other Scotiabank accounts through eligible self-service channels.",
+    "client_signal": [
+      "frequent_internal_transfers",
+      "savings_transfer_activity",
+      "uses_online_banking",
+      "uses_mobile_banking"
+    ],
+    "model_use": "Flag clients who frequently move money between Scotiabank accounts and may value flexible savings transfers.",
+    "source_doc": "Day-to-Day Banking Companion Booklet",
+    "source_page": 34
+  },
+  {
+    "benefit_id": "MOMENTUMPLUS_PREMIUM_PERIOD_SAVINGS",
+    "product_category": "savings",
+    "product_name": "MomentumPLUS Savings Account",
+    "customer_benefit": "MomentumPLUS Savings allows clients to earn premium interest based on selected premium periods, with longer periods generally linked to different premium interest treatment.",
+    "client_signal": [
+      "idle_cash_balance",
+      "stable_savings_balance",
+      "low_withdrawal_frequency",
+      "savings_goal",
+      "term_savings_preference"
+    ],
+    "model_use": "Recommend MomentumPLUS review for clients with stable cash balances that may not need frequent withdrawals.",
+    "source_doc": "Day-to-Day Banking Companion Booklet",
+    "source_page": 31
+  },
+  {
+    "benefit_id": "SAVINGS_ACCELERATOR_TIERED_INTEREST",
+    "product_category": "savings",
+    "product_name": "Scotiabank Savings Accelerator Account",
+    "customer_benefit": "Savings Accelerator Account offers interest rates based on account balance, with multiple rate tiers and the ability to hold the account in a registered plan.",
+    "client_signal": [
+      "large_savings_balance",
+      "registered_plan_interest",
+      "tfsa_or_rrsp_savings_need",
+      "tiered_interest_opportunity"
+    ],
+    "model_use": "Flag clients with larger savings balances or registered-plan savings needs for Savings Accelerator review.",
+    "source_doc": "Day-to-Day Banking Companion Booklet",
+    "source_page": 33
+  },
+  {
+    "benefit_id": "USD_ACCOUNT_FOREIGN_EXCHANGE_NEED",
+    "product_category": "foreign_currency_account",
+    "product_name": "Scotia U.S. Dollar Daily Interest Account",
+    "customer_benefit": "A U.S. dollar account may help clients who travel to the U.S. often or make and receive U.S. dollar payments avoid converting every transaction to Canadian dollars.",
+    "client_signal": [
+      "usd_transactions",
+      "travel_to_us",
+      "receives_usd_income",
+      "pays_usd_bills",
+      "foreign_currency_conversion_fees"
+    ],
+    "model_use": "Recommend U.S. dollar account review for clients with recurring U.S. dollar activity.",
+    "source_doc": "Day-to-Day Banking Companion Booklet",
+    "source_page": 35
+  },
+  {
+    "benefit_id": "USD_ACCOUNT_FREE_USD_DRAFTS",
+    "product_category": "foreign_currency_account",
+    "product_name": "Scotia U.S. Dollar Daily Interest Account",
+    "customer_benefit": "U.S. Dollar Daily Interest Account includes no fee for U.S. dollar drafts purchased from the account.",
+    "client_signal": [
+      "usd_draft_fee_detected",
+      "large_usd_payments",
+      "usd_payment_activity",
+      "cross_border_payment_need"
+    ],
+    "model_use": "Flag clients who purchase U.S. dollar drafts for possible U.S. dollar account benefit review.",
+    "source_doc": "Day-to-Day Banking Companion Booklet",
+    "source_page": 35
+  }
+]
