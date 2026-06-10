@@ -20,6 +20,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 import streamlit as st
 from chromadb.utils.embedding_functions import SentenceTransformerEmbeddingFunction
+from insight_engine import generate_financial_insights
 
 load_dotenv("data/.env")
 OPENROUTER_KEY = os.environ.get("OpenrouterApiKey", "").strip().strip("'\"")
@@ -168,17 +169,51 @@ section[data-testid="stSidebar"] .stTextInput > div > div {{
   background: rgba(255,255,255,0.05) !important;
   border: 1px solid rgba(255,255,255,0.08) !important;
   border-radius: 9px !important;
+  min-height: 44px !important;
+  display: flex !important;
+  align-items: center !important;
   transition: border-color 0.15s !important;
 }}
 section[data-testid="stSidebar"] .stTextInput > div > div:focus-within {{
   border-color: {PRIMARY}80 !important;
   background: rgba(255,255,255,0.07) !important;
 }}
-section[data-testid="stSidebar"] input {{
+section[data-testid="stSidebar"] .stTextInput label {{
+  display: none !important;
+}}
+section[data-testid="stSidebar"] .stTextInput input {{
   background: transparent !important;
   border: none !important;
   color: #e2e8f0 !important;
   border-radius: 9px !important;
+  min-height: 44px !important;
+  line-height: 1.4 !important;
+  padding: 0.55rem 0.75rem !important;
+  font-size: 0.95rem !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}}
+section[data-testid="stSidebar"] .stTextInput input::placeholder {{
+  color: #94a3b8 !important;
+  opacity: 1 !important;
+}}
+/* Keep BaseWeb's internal selectbox keyboard input invisible so it doesn't
+   overlay the rendered selected value in the client selector. */
+section[data-testid="stSidebar"] .stSelectbox [data-baseweb="select"] input {{
+  position: absolute !important;
+  width: 1px !important;
+  min-width: 1px !important;
+  height: 1px !important;
+  min-height: 1px !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  border: 0 !important;
+  opacity: 0 !important;
+  color: transparent !important;
+  background: transparent !important;
+  caret-color: transparent !important;
+  pointer-events: none !important;
 }}
 section[data-testid="stSidebar"] hr {{
   border-color: rgba(255,255,255,0.06) !important;
@@ -365,13 +400,16 @@ input, select, textarea, button, label, p, span, div, h1, h2, h3, h4, h5 {{
 }}
 
 /* ── FORCE LIGHT INPUTS IN MAIN CONTENT ─────────────────────── */
-.block-container input,
-.block-container textarea,
-.block-container [data-baseweb="input"] input,
-.block-container [data-baseweb="select"] > div:first-child,
-.block-container .stSelectbox [data-baseweb="select"] > div,
-.block-container .stNumberInput [data-baseweb="input"] > div,
-.block-container .stNumberInput input {{
+/* Scope these rules to the main app area only. A broader `.block-container input`
+   selector was also styling Streamlit's hidden internal inputs used for keyboard
+   navigation, which surfaced key-like text such as `keyboard_search_customer`
+   and overlapped expander titles. Keep this limited to visible form widgets. */
+[data-testid="stAppViewContainer"] .main .block-container .stTextInput input,
+[data-testid="stAppViewContainer"] .main .block-container .stTextArea textarea,
+[data-testid="stAppViewContainer"] .main .block-container [data-baseweb="select"] > div:first-child,
+[data-testid="stAppViewContainer"] .main .block-container .stSelectbox [data-baseweb="select"] > div,
+[data-testid="stAppViewContainer"] .main .block-container .stNumberInput [data-baseweb="input"] > div,
+[data-testid="stAppViewContainer"] .main .block-container .stNumberInput input {{
   background: {SURFACE} !important;
   background-color: {SURFACE} !important;
   color: {DARK} !important;
@@ -382,22 +420,22 @@ input, select, textarea, button, label, p, span, div, h1, h2, h3, h4, h5 {{
 }}
 
 /* Selectbox value text + dropdown */
-.block-container [data-baseweb="select"] span,
-.block-container [data-baseweb="select"] div {{
+[data-testid="stAppViewContainer"] .main .block-container [data-baseweb="select"] span,
+[data-testid="stAppViewContainer"] .main .block-container [data-baseweb="select"] div {{
   color: {DARK} !important;
   background: {SURFACE} !important;
   font-family: 'Inter', sans-serif !important;
 }}
 
 /* stSelectbox outer wrapper */
-.block-container .stSelectbox > div > div {{
+[data-testid="stAppViewContainer"] .main .block-container .stSelectbox > div > div {{
   background: {SURFACE} !important;
   border: 1px solid {BORDER} !important;
   border-radius: 10px !important;
 }}
 
 /* NumberInput +/- buttons */
-.block-container .stNumberInput button {{
+[data-testid="stAppViewContainer"] .main .block-container .stNumberInput button {{
   background: {SURFACE} !important;
   border-color: {BORDER} !important;
   color: {DARK} !important;
@@ -609,12 +647,56 @@ def get_chroma():
     ef = SentenceTransformerEmbeddingFunction(model_name="all-MiniLM-L6-v2")
     return client.get_collection("bank_customers", embedding_function=ef)
 
-customers  = load_customers()
+def customer_id_value(customer):
+    return str(customer.get("id") or customer.get("customer_id") or "")
+
+
+def customer_name_value(customer):
+    return customer.get("name") or customer.get("customer_name") or "Unknown Client"
+
+
+def get_selected_customer(customers, selected_customer_id):
+    selected_customer_id = str(selected_customer_id or "")
+    return next(
+        (
+            customer for customer in customers
+            if customer_id_value(customer) == selected_customer_id
+        ),
+        None,
+    )
+
+
+def build_customer_context(selected_customer):
+    if not selected_customer:
+        return {}
+    return {
+        "customer_id": selected_customer.get("id") or selected_customer.get("customer_id"),
+        "name": selected_customer.get("name") or selected_customer.get("customer_name"),
+        "age": selected_customer.get("age"),
+        "annual_income": selected_customer.get("annual_income"),
+        "monthly_expenses": selected_customer.get("monthly_expenses"),
+        "checking_balance": selected_customer.get("checking_balance"),
+        "savings_balance": selected_customer.get("savings_balance"),
+        "investment_balance": selected_customer.get("investment_balance"),
+        "total_debt": selected_customer.get("total_debt"),
+        "debt_to_income_ratio": selected_customer.get("debt_to_income_ratio"),
+        "payment_to_income_ratio": selected_customer.get("payment_to_income_ratio"),
+        "credit_score": selected_customer.get("credit_score"),
+        "risk_tier": selected_customer.get("risk_tier"),
+        "risk_score": selected_customer.get("risk_score"),
+        "financial_goals": selected_customer.get("financial_goals", []),
+        "transactions": selected_customer.get("transactions", []),
+        "loans": selected_customer.get("loans", []),
+    }
+
+
+customers = load_customers()
 collection = get_chroma()
-cust_index = {c["id"]: c for c in customers}
-customers  = load_customers()
-collection = get_chroma()
-cust_index = {c["id"]: c for c in customers}
+cust_index = {}
+for customer in customers:
+    for key in {customer.get("id"), customer.get("customer_id")}:
+        if key:
+            cust_index[str(key)] = customer
 
 df = pd.DataFrame([{
     "id": c["id"], "name": c["name"], "age": c["age"],
@@ -1262,6 +1344,7 @@ PILLAR_DEF_MAP = {pillar["slug"]: pillar for pillar in PILLAR_DEFS}
 CLIENT_PROFILE_TABS = ["Overview", "Transactions", "Loans", "Analytics", "6 Pillars"]
 CURRENT_PAGE_KEY = "current_page"
 MAIN_NAV_WIDGET_KEY = "main_nav_widget"
+SELECTED_CUSTOMER_WIDGET_KEY = "selected_customer_widget"
 VIEW_OPTIONS = [
     "📊   Portfolio",
     "👤   Client Profile",
@@ -1298,14 +1381,21 @@ def on_main_nav_change():
     st.session_state[CURRENT_PAGE_KEY] = VIEW_MAP[selected_label]
 
 
+def on_selected_customer_change():
+    selected_customer_id = st.session_state.get(SELECTED_CUSTOMER_WIDGET_KEY)
+    if selected_customer_id:
+        st.session_state["selected_customer_id"] = selected_customer_id
+
+
 def ensure_navigation_state():
-    default_customer_id = customers[0]["id"] if customers else None
+    default_customer_id = customer_id_value(customers[0]) if customers else None
     legacy_page = st.session_state.get("page", "Portfolio Overview")
     st.session_state.setdefault(CURRENT_PAGE_KEY, legacy_page)
     st.session_state.setdefault(MAIN_NAV_WIDGET_KEY, VIEW_MAP_REVERSE.get(st.session_state[CURRENT_PAGE_KEY], VIEW_OPTIONS[0]))
     st.session_state.setdefault("active_client_tab", "Overview")
     st.session_state.setdefault("selected_pillar", "overview")
     st.session_state.setdefault("selected_customer_id", default_customer_id)
+    st.session_state.setdefault(SELECTED_CUSTOMER_WIDGET_KEY, st.session_state["selected_customer_id"])
 
     query_pillar = _query_param_value(PILLAR_ROUTE_KEY)
     if query_pillar is not None:
@@ -1321,6 +1411,7 @@ def ensure_navigation_state():
 
     if st.session_state["selected_customer_id"] not in cust_index and default_customer_id is not None:
         st.session_state["selected_customer_id"] = default_customer_id
+        st.session_state[SELECTED_CUSTOMER_WIDGET_KEY] = default_customer_id
 
     nav_label = VIEW_MAP_REVERSE.get(
         st.session_state.get(CURRENT_PAGE_KEY, "Portfolio Overview"),
@@ -3046,47 +3137,64 @@ with st.sidebar:
     )
 
     search_query = st.text_input(
-        "search",
-        placeholder="🔍  Search by name or ID…",
+        "Search client",
+        placeholder="Search by name or ID",
+        key="client_search_input",
         label_visibility="collapsed",
     )
 
-    all_opts = sorted([(c["id"], c["name"]) for c in customers], key=lambda x: x[1])
+    all_opts = sorted(
+        [(customer_id_value(c), customer_name_value(c)) for c in customers],
+        key=lambda x: x[1],
+    )
     if search_query.strip():
         q = search_query.strip().lower()
-        all_opts = [(cid, nm) for cid, nm in all_opts
-                    if q in nm.lower() or q in cid.lower()]
+        all_opts = [
+            (cid, nm) for cid, nm in all_opts
+            if q in nm.lower() or q in cid.lower()
+        ]
 
     if all_opts:
-        options_map = {f"{nm}  ({cid})": cid for cid, nm in all_opts}
-        labels = list(options_map.keys())
         current_customer_id = st.session_state.get("selected_customer_id")
-        if current_customer_id not in options_map.values():
-            current_customer_id = options_map[labels[0]]
+        if current_customer_id and current_customer_id not in [cid for cid, _ in all_opts]:
+            current_customer = get_selected_customer(customers, current_customer_id)
+            if current_customer:
+                all_opts = [
+                    (customer_id_value(current_customer), customer_name_value(current_customer)),
+                    *all_opts,
+                ]
+
+        option_ids = []
+        option_names = {}
+        for cid, nm in all_opts:
+            if cid not in option_names:
+                option_ids.append(cid)
+                option_names[cid] = nm
+
+        if current_customer_id not in option_ids:
+            current_customer_id = option_ids[0]
             st.session_state["selected_customer_id"] = current_customer_id
-        current_index = next(
-            (idx for idx, label in enumerate(labels) if options_map[label] == current_customer_id),
-            0,
-        )
-        sel_label = st.selectbox(
+
+        st.session_state[SELECTED_CUSTOMER_WIDGET_KEY] = current_customer_id
+        st.selectbox(
             "client",
-            labels,
-            index=current_index,
-            key="selected_client_label",
+            option_ids,
+            key=SELECTED_CUSTOMER_WIDGET_KEY,
+            format_func=lambda cid: f"{option_names.get(cid, cid)}  ({cid})",
+            on_change=on_selected_customer_change,
             label_visibility="collapsed",
         )
-        sel_id = options_map[sel_label]
-        st.session_state["selected_customer_id"] = sel_id
+        sel_id = st.session_state.get("selected_customer_id", current_customer_id)
     else:
         st.markdown(
             f"<div style='font-size:0.75rem;color:#475569;padding:6px 2px'>"
             f"No clients found for <b style='color:#94a3b8'>{search_query}</b></div>",
             unsafe_allow_html=True,
         )
-        sel_id = sorted(cust_index.keys())[0]
-        st.session_state["selected_customer_id"] = sel_id
+        sel_id = st.session_state.get("selected_customer_id") or (customer_id_value(customers[0]) if customers else "")
 
-    sel = cust_index[sel_id]
+    sel = get_selected_customer(customers, sel_id) or customers[0]
+    st.session_state["selected_customer_id"] = customer_id_value(sel)
 
     # Client mini-card
     rc  = RISK_COLORS[sel["risk_tier"]]
@@ -3130,10 +3238,7 @@ def get_client():
     if not OPENROUTER_KEY:
         return None
     return OpenAI(base_url="https://openrouter.ai/api/v1", api_key=OPENROUTER_KEY)
-    return OpenAI(base_url="https://openrouter.ai/api/v1", api_key=OPENROUTER_KEY)
 
-OR_MODEL      = "anthropic/claude-opus-4-5"
-OR_FAST_MODEL = "openai/gpt-4o-mini"
 OR_MODEL      = "anthropic/claude-opus-4-5"
 OR_FAST_MODEL = "openai/gpt-4o-mini"
 
@@ -3166,14 +3271,21 @@ def rag_query(question: str, n: int = 5):
     except Exception as e:
         return f"⚠️ Vector DB error: {e}", []
 
-    context  = "\n\n---\n\n".join(docs)
+    selected_customer = get_selected_customer(customers, st.session_state.get("selected_customer_id"))
+    customer_context = json.dumps(build_customer_context(selected_customer), indent=2, default=str)
+    context = "\n\n---\n\n".join(docs)
     system   = (
         "You are a senior lending officer at Scotiabank with expertise in credit risk "
-        "and financial analysis. You have customer profiles retrieved from the database. "
+        "and financial analysis. Use the currently selected customer as the primary context, "
+        "then use retrieved customer profiles as supporting evidence when relevant. "
         "Respond professionally, cite specific numbers, flag risk factors clearly. "
         "For loan eligibility be direct: APPROVED / CONDITIONALLY APPROVED / DECLINED."
     )
-    user_msg = f"Customer profiles:\n\n{context}\n\nQuestion: {question}"
+    user_msg = (
+        f"Selected customer context:\n{customer_context}\n\n"
+        f"Retrieved customer profiles:\n\n{context}\n\n"
+        f"Question: {question}"
+    )
 
     with st.spinner("Analysing..."):
         text = ai_chat(system, user_msg, model=OR_FAST_MODEL, max_tokens=1500)
@@ -3509,33 +3621,7 @@ elif view == "Client Profile":
                 unsafe_allow_html=True,
             )
 
-            section_title("Personal & Employment")
-            rows_html = "".join([
-                kv_row("Age / Gender",     f"{c['age']} / {c['gender']}"),
-                kv_row("Email",            c["email"]),
-                kv_row("Phone",            c["phone"]),
-                kv_row("Address",          c["address"]),
-                kv_row("Employment",       f"{c['employment_status']} — {c['job_title']}"),
-                kv_row("Employer",         c["employer"]),
-                kv_row("Tenure",           f"{c['years_at_employer']} years"),
-                kv_row("Monthly Expenses", f"${c['monthly_expenses']:,}"),
-            ])
-            st.markdown(
-                f"<div style='background:{SURFACE};border:1px solid {BORDER};"
-                f"border-radius:14px;padding:1rem 1.25rem;'>{rows_html}</div>",
-                unsafe_allow_html=True,
-            )
-
         with col2:
-            section_title("Account Balances")
-            bal = pd.DataFrame({
-                "Account": ["Checking", "Savings", "Investments"],
-                "Balance": [c["checking_balance"], c["savings_balance"], c["investment_balance"]],
-            })
-            fig = px.bar(bal, x="Account", y="Balance", color="Account",
-                         text_auto="$.2s",
-                         color_discrete_sequence=["#3b82f6", SUCCESS, PRIMARY])
-            fig.update_traces(textposition="outside", marker_line_width=0, opacity=0.85)
             section_title("Account Balances")
             bal = pd.DataFrame({
                 "Account": ["Checking", "Savings", "Investments"],
@@ -3549,13 +3635,7 @@ elif view == "Client Profile":
             st.plotly_chart(chart(fig, 240), use_container_width=True)
 
             section_title("Credit Risk Flags")
-
-            section_title("Credit Risk Flags")
             flags = [
-                ("Late Payments",            str(c["num_late_payments"]),           c["num_late_payments"] > 0),
-                ("Months Since Delinquency", str(c.get("months_since_last_delinquency") or "—"), False),
-                ("Open Accounts",            str(c["num_open_accounts"]),            False),
-                ("Bankruptcy",               "Yes ⚠️" if c["bankruptcy_history"] else "No ✅", c["bankruptcy_history"]),
                 ("Late Payments",            str(c["num_late_payments"]),           c["num_late_payments"] > 0),
                 ("Months Since Delinquency", str(c.get("months_since_last_delinquency") or "—"), False),
                 ("Open Accounts",            str(c["num_open_accounts"]),            False),
@@ -3573,65 +3653,79 @@ elif view == "Client Profile":
         txns = c.get("transactions", [])
         if txns:
             txn_df = pd.DataFrame(txns)
-            txn_df["date"] = pd.to_datetime(txn_df["date"])
+            txn_df["date"] = pd.to_datetime(txn_df.get("date"), errors="coerce")
+            txn_df["amount"] = pd.to_numeric(txn_df.get("amount"), errors="coerce").fillna(0)
+            txn_df = txn_df.dropna(subset=["date"]).sort_values("date")
 
-            c1, c2 = st.columns(2, gap="medium")
-            with c1:
-                section_title("Monthly Cash Flow")
-                mo = txn_df.groupby(txn_df["date"].dt.to_period("M"))["amount"].sum().reset_index()
-                mo["date"] = mo["date"].astype(str)
-                mo["type"] = mo["amount"].apply(lambda x: "Inflow" if x >= 0 else "Outflow")
-                fig = px.bar(mo, x="date", y="amount", color="type",
-                             color_discrete_map={"Inflow": SUCCESS, "Outflow": PRIMARY},
-                             labels={"date": "Month", "amount": "Net ($)", "type": ""})
-                fig.update_traces(marker_line_width=0, opacity=0.85)
-                fig.update_layout(
-                    margin=dict(l=24, r=16, t=20, b=44),
-                    legend=dict(
-                        orientation="h",
-                        yanchor="top",
-                        y=-0.2,
-                        xanchor="center",
-                        x=0.5,
-                        font=dict(size=10),
-                    ),
+            if txn_df.empty:
+                st.info("No valid transaction history available for this customer.")
+            else:
+                c1, c2 = st.columns(2, gap="medium")
+                with c1:
+                    section_title("Monthly Cash Flow")
+                    monthly_cash_flow = (
+                        txn_df.assign(month=txn_df["date"].dt.to_period("M").dt.to_timestamp())
+                        .groupby("month", as_index=False)["amount"]
+                        .sum()
+                        .rename(columns={"amount": "net_cash_flow"})
+                        .sort_values("month")
+                    )
+                    fig = px.bar(
+                        monthly_cash_flow,
+                        x="month",
+                        y="net_cash_flow",
+                        title="Monthly Cash Flow",
+                        labels={"month": "Month", "net_cash_flow": "Net Cash Flow ($)"},
+                        color_discrete_sequence=[PRIMARY],
+                    )
+                    fig.update_traces(marker_line_width=0, opacity=0.85)
+                    fig.update_layout(
+                        showlegend=False,
+                        xaxis_tickformat="%Y-%m",
+                        yaxis_tickprefix="$",
+                        margin=dict(l=20, r=20, t=40, b=20),
+                        height=420,
+                    )
+                    st.plotly_chart(fig, use_container_width=True)
+
+                with c2:
+                    section_title("Spending by Category")
+                    exp = txn_df[txn_df["amount"] < 0].copy()
+                    exp["amount"] = exp["amount"].abs()
+                    if exp.empty:
+                        st.info("No spending transactions available for this customer.")
+                    else:
+                        cs = exp.groupby("category")["amount"].sum().reset_index()
+                        fig = px.pie(cs, names="category", values="amount", hole=0.48,
+                                     color_discrete_sequence=px.colors.qualitative.Pastel)
+                        fig.update_traces(textposition="inside", textinfo="percent",
+                                          marker=dict(line=dict(color=SURFACE, width=1.5)))
+                        fig.update_layout(
+                            margin=dict(l=16, r=16, t=20, b=54),
+                            legend=dict(
+                                orientation="h",
+                                yanchor="top",
+                                y=-0.22,
+                                xanchor="center",
+                                x=0.5,
+                                font=dict(size=9),
+                            ),
+                        )
+                        st.plotly_chart(chart(fig, 280), use_container_width=True)
+
+                section_title("Recent Transactions")
+                disp = txn_df.head(50).copy()
+                disp["Date"] = disp["date"].dt.strftime("%Y-%m-%d")
+                disp["Amount"] = disp["amount"].apply(
+                    lambda x: f"+${x:,.2f}" if x > 0 else f"-${abs(x):,.2f}"
                 )
-                st.plotly_chart(chart(fig, 280), use_container_width=True)
-
-            with c2:
-                section_title("Spending by Category")
-                exp = txn_df[txn_df["amount"] < 0].copy()
-                exp["amount"] = exp["amount"].abs()
-                cs = exp.groupby("category")["amount"].sum().reset_index()
-                fig = px.pie(cs, names="category", values="amount", hole=0.48,
-                             color_discrete_sequence=px.colors.qualitative.Pastel)
-                fig.update_traces(textposition="inside", textinfo="percent",
-                                  marker=dict(line=dict(color=SURFACE, width=1.5)))
-                fig.update_layout(
-                    margin=dict(l=16, r=16, t=20, b=54),
-                    legend=dict(
-                        orientation="h",
-                        yanchor="top",
-                        y=-0.22,
-                        xanchor="center",
-                        x=0.5,
-                        font=dict(size=9),
-                    ),
+                st.dataframe(
+                    disp[["Date", "category", "description", "Amount"]]
+                    .rename(columns={"category": "Category", "description": "Description"}),
+                    use_container_width=True, height=320, hide_index=True,
                 )
-                st.plotly_chart(chart(fig, 280), use_container_width=True)
-
-            section_title("Recent Transactions")
-            disp = txn_df.head(50).copy()
-            disp["Date"]   = disp["date"].dt.strftime("%Y-%m-%d")
-            disp["Date"]   = disp["date"].dt.strftime("%Y-%m-%d")
-            disp["Amount"] = disp["amount"].apply(
-                lambda x: f"+${x:,.2f}" if x > 0 else f"-${abs(x):,.2f}"
-            )
-            st.dataframe(
-                disp[["Date", "category", "description", "Amount"]]
-                .rename(columns={"category": "Category", "description": "Description"}),
-                use_container_width=True, height=320, hide_index=True,
-            )
+        else:
+            st.info("No transaction history for this client.")
 
     # ── LOANS ─────────────────────────────────────────────────────────────────
     elif active_client_tab == "Loans":
@@ -3641,30 +3735,8 @@ elif view == "Client Profile":
 
         if active:
             section_title(f"Active Loans ({len(active)})")
-            section_title(f"Active Loans ({len(active)})")
             for l in active:
                 st.markdown(loan_card_html(l), unsafe_allow_html=True)
-                st.markdown(loan_card_html(l), unsafe_allow_html=True)
-
-            section_title("Amortization Schedule")
-            fig = go.Figure()
-            for i, l in enumerate(active):
-                r   = l["rate"] / 100 / 12
-                s   = datetime.strptime(l["start_date"], "%Y-%m-%d")
-                e   = datetime.strptime(l["end_date"],   "%Y-%m-%d")
-                n   = int((e - s).days / 30)
-                bal = l["amount"]
-                dates, bals = [], []
-                for m in range(min(n, 360)):
-                    dates.append(s + timedelta(days=30 * m))
-                    bals.append(bal)
-                    bal = max(0, bal - (l["monthly_payment"] - bal * r))
-                fig.add_trace(go.Scatter(
-                    x=dates, y=bals, name=l["type"], mode="lines",
-                    line=dict(color=PALETTE[i % len(PALETTE)], width=2.5),
-                ))
-            fig.update_layout(yaxis_tickformat="$,.0f", xaxis_title="Date", yaxis_title="Balance")
-            st.plotly_chart(chart(fig, 320), use_container_width=True)
 
             section_title("Amortization Schedule")
             fig = go.Figure()
@@ -3689,8 +3761,6 @@ elif view == "Client Profile":
         if closed:
             st.markdown("<div style='height:4px'></div>", unsafe_allow_html=True)
             section_title(f"Closed Loans ({len(closed)})")
-            st.markdown("<div style='height:4px'></div>", unsafe_allow_html=True)
-            section_title(f"Closed Loans ({len(closed)})")
             for l in closed:
                 st.markdown(
                     f"<div style='background:{SURFACE};border:1px solid {BORDER};"
@@ -3713,7 +3783,6 @@ elif view == "Client Profile":
 
         c1, c2 = st.columns(2, gap="medium")
         with c1:
-            section_title("Financial Health Radar")
             section_title("Financial Health Radar")
             cats = ["Credit Score", "Low DTI", "Income", "Assets", "Job Tenure", "Clean Record"]
             vals = [
@@ -3751,16 +3820,9 @@ elif view == "Client Profile":
                 ("Annual Income", c["annual_income"],            int(peers.annual_income.mean()), "${:,}"),
                 ("Total Debt",    c["total_debt"],               int(peers.total_debt.mean()),    "${:,}"),
                 ("DTI Ratio",     c["debt_to_income_ratio"],     float(peers.dti.mean()),         "{:.1%}"),
-                ("Credit Score",  c["credit_score"],             int(peers.credit_score.mean()),  None),
-                ("Annual Income", c["annual_income"],            int(peers.annual_income.mean()), "${:,}"),
-                ("Total Debt",    c["total_debt"],               int(peers.total_debt.mean()),    "${:,}"),
-                ("DTI Ratio",     c["debt_to_income_ratio"],     float(peers.dti.mean()),         "{:.1%}"),
             ]
             rows = []
-            rows = []
             for label, cval, pval, fmt in compare_items:
-                cv = fmt.format(cval) if fmt else str(cval)
-                pv = fmt.format(pval) if fmt else str(pval)
                 cv = fmt.format(cval) if fmt else str(cval)
                 pv = fmt.format(pval) if fmt else str(pval)
                 pct = (cval - pval) / max(abs(pval), 1) * 100
@@ -3784,6 +3846,32 @@ elif view == "Client Profile":
                 + "".join(rows) + "</div>",
                 unsafe_allow_html=True,
             )
+
+        st.markdown("<div style='height:14px'></div>", unsafe_allow_html=True)
+        section_title("Financial Insights")
+        insight_result = generate_financial_insights(c)
+        insights = insight_result.get("insights", [])
+        st.caption(
+            "Financial insights are generated from available customer data and rule-based thresholds "
+            "for advisor support only. Advisors should verify client needs, eligibility, fees, rates, "
+            "affordability, and product suitability before making any recommendation."
+        )
+
+        if insights:
+            for insight in insights:
+                with st.container(border=True):
+                    st.markdown(f"### {insight['title']}")
+                    st.caption(
+                        f"{insight['insight_type']} | "
+                        f"Severity: {insight['severity']} | "
+                        f"Confidence: {insight['confidence']}"
+                    )
+                    st.write("**Financial meaning:**")
+                    st.write(insight["financial_meaning"])
+                    st.write("**Advisor action:**")
+                    st.write(insight["advisor_action"])
+        else:
+            st.info("No rule-based financial insights were generated for this client.")
 
     # ── 6 PILLARS ────────────────────────────────────────────────────────────
     elif active_client_tab == "6 Pillars":
@@ -4364,21 +4452,25 @@ elif view == "AI Assistant":
         try:
             results = collection.query(query_texts=[question], n_results=5)
             docs    = results["documents"][0]
-            context = "\n\n---\n\n".join(docs)
         except Exception as e:
             return f"⚠️ Database error: {e}"
+        selected_customer = get_selected_customer(customers, st.session_state.get("selected_customer_id"))
+        customer_context = json.dumps(build_customer_context(selected_customer), indent=2, default=str)
+        context = "\n\n---\n\n".join(docs)
         system_msg = (
             "You are a senior lending officer at Scotiabank with expertise in credit risk. "
-            "Answer based on the customer profiles below. Be direct, cite specific numbers, "
+            "Always use the currently selected customer as the primary context. "
+            "Use the retrieved customer profiles below only as supporting evidence when relevant. "
+            "Be direct, cite specific numbers, "
             "and flag risk factors clearly. For loan eligibility give a clear APPROVED / "
             "CONDITIONALLY APPROVED / DECLINED verdict."
         )
-        return ai_chat(system_msg,
-                       f"Customer profiles:\n\n{context}\n\nQuestion: {question}",
-                       model=OR_FAST_MODEL)
-        return ai_chat(system_msg,
-                       f"Customer profiles:\n\n{context}\n\nQuestion: {question}",
-                       model=OR_FAST_MODEL)
+        return ai_chat(
+            system_msg,
+            f"Selected customer context:\n{customer_context}\n\n"
+            f"Retrieved customer profiles:\n\n{context}\n\nQuestion: {question}",
+            model=OR_FAST_MODEL,
+        )
 
     # Chat history
     # Chat history
