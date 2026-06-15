@@ -3830,6 +3830,180 @@ if view == "Portfolio Overview":
 
     # ── CLIENT DIRECTORY ─────────────────────────────────────────────────────
     st.markdown("<div style='height:12px'></div>", unsafe_allow_html=True)
+    # ── TODAY'S PRIORITY QUEUE ────────────────────────────────────────────────
+    section_title("🎯 Today's Client Priority Queue")
+
+    @st.cache_data
+    def compute_priority_queue(customers_list):
+        """Score every client and return a ranked priority DataFrame."""
+        from datetime import date as _date
+        today = _date.today()
+        sdf   = get_stress_df()
+        base  = sdf[sdf["scenario"] == "Base"].set_index("id")
+
+        rows = []
+        for c in customers_list:
+            cid     = c["id"]
+            b       = base.loc[cid] if cid in base.index else None
+
+            # ── Signal scores (0-100 each, weighted sum → triage_score) ──────
+            s = {}
+
+            # 1. Missed payments (weight 30)
+            missed = sum(int(l.get("missed_payments", 0) or 0) for l in c.get("loans", []) if l.get("status") == "Active")
+            s["missed"] = min(30, missed * 10)
+
+            # 2. DTI (weight 20)
+            dti = float(c.get("debt_to_income_ratio", 0) or 0)
+            s["dti"] = min(20, max(0, (dti - 0.35) / 0.65 * 20)) if dti > 0.35 else 0
+
+            # 3. Credit score risk (weight 15)
+            cs = int(c.get("credit_score", 700) or 700)
+            s["credit"] = min(15, max(0, (670 - cs) / 370 * 15)) if cs < 670 else 0
+
+            # 4. Rate stress — +50bps payment delta (weight 15)
+            row_50 = sdf[(sdf["id"] == cid) & (sdf["scenario"] == "+50 bps")]
+            base_row = sdf[(sdf["id"] == cid) & (sdf["scenario"] == "Base")]
+            if not row_50.empty and not base_row.empty:
+                delta = float(row_50.iloc[0]["stressed_payment"]) - float(base_row.iloc[0]["stressed_payment"])
+                s["rate"] = min(15, delta / 500 * 15)
+            else:
+                s["rate"] = 0
+
+            # 5. Mortgage renewing ≤12mo (weight 15)
+            active_loans = [l for l in c.get("loans", []) if l.get("status") == "Active"]
+            renewing = False
+            renewal_str = ""
+            for l in active_loans:
+                if l.get("type") == "Mortgage":
+                    try:
+                        end_dt = _date.fromisoformat(str(l["end_date"])[:10])
+                        days   = (end_dt - today).days
+                        if 0 < days <= 365:
+                            renewing = True
+                            renewal_str = f"{int(days/30)}mo"
+                    except Exception:
+                        pass
+            s["renewal"] = 15 if renewing else 0
+
+            # 6. Liquidity runway < 3mo (weight 10)
+            liquid   = float(c.get("checking_balance", 0) or 0) + float(c.get("savings_balance", 0) or 0)
+            base_pmt = float(base_row.iloc[0]["stressed_payment"]) if not base_row.empty else 1
+            runway   = liquid / base_pmt if base_pmt > 0 else 99
+            s["liquidity"] = 10 if runway < 3 else (5 if runway < 6 else 0)
+
+            triage_score = sum(s.values())
+
+            # Priority tier
+            if triage_score >= 35:
+                tier, icon = "High", "🔴"
+            elif triage_score >= 15:
+                tier, icon = "Medium", "🟡"
+            else:
+                tier, icon = "Low", "🟢"
+
+            # Top reason
+            top_signal = max(s, key=s.get)
+            reason_map = {
+                "missed":    f"Missed payments ({missed})",
+                "dti":       f"High DTI ({dti:.0%})",
+                "credit":    f"Low credit score ({cs})",
+                "rate":      f"Rate sensitive (+${delta:.0f}/mo at +50bps)" if "delta" in dir() else "Rate sensitive",
+                "renewal":   f"Mortgage renewing ({renewal_str})",
+                "liquidity": f"Low liquidity ({runway:.1f}mo runway)",
+            }
+            top_reason = reason_map.get(top_signal, "—") if s[top_signal] > 0 else "No urgent signals"
+
+            rows.append({
+                "id":           cid,
+                "name":         c["name"],
+                "tier":         tier,
+                "icon":         icon,
+                "triage_score": round(triage_score, 1),
+                "top_reason":   top_reason,
+                "dti":          f"{dti:.0%}",
+                "credit_score": cs,
+                "missed":       missed,
+                "renewal":      renewal_str if renewing else "—",
+                "employment":   c.get("employment_status", ""),
+            })
+
+        return pd.DataFrame(rows).sort_values("triage_score", ascending=False).reset_index(drop=True)
+
+    pq_df = compute_priority_queue(customers)
+
+    # Summary bar
+    n_high   = (pq_df["tier"] == "High").sum()
+    n_medium = (pq_df["tier"] == "Medium").sum()
+    n_low    = (pq_df["tier"] == "Low").sum()
+    st.markdown(
+        f"<div style='display:flex;gap:12px;margin-bottom:1rem'>"
+        f"<div style='background:{DANGER}12;border:1px solid {DANGER}30;border-radius:10px;"
+        f"padding:0.6rem 1.2rem;text-align:center'>"
+        f"<div style='font-size:1.4rem;font-weight:800;color:{DANGER}'>{n_high}</div>"
+        f"<div style='font-size:0.65rem;text-transform:uppercase;color:{MUTED};font-weight:600'>🔴 Follow Up</div></div>"
+        f"<div style='background:{WARNING}12;border:1px solid {WARNING}30;border-radius:10px;"
+        f"padding:0.6rem 1.2rem;text-align:center'>"
+        f"<div style='font-size:1.4rem;font-weight:800;color:{WARNING}'>{n_medium}</div>"
+        f"<div style='font-size:0.65rem;text-transform:uppercase;color:{MUTED};font-weight:600'>🟡 Monitor</div></div>"
+        f"<div style='background:{SUCCESS}12;border:1px solid {SUCCESS}30;border-radius:10px;"
+        f"padding:0.6rem 1.2rem;text-align:center'>"
+        f"<div style='font-size:1.4rem;font-weight:800;color:{SUCCESS}'>{n_low}</div>"
+        f"<div style='font-size:0.65rem;text-transform:uppercase;color:{MUTED};font-weight:600'>🟢 No Action</div></div>"
+        f"<div style='flex:1;background:{SURFACE};border:1px solid {BORDER};border-radius:10px;"
+        f"padding:0.6rem 1.2rem;display:flex;align-items:center'>"
+        f"<span style='font-size:0.82rem;color:{MUTED}'>"
+        f"Ranked by macro stress signals — missed payments, DTI, credit score, rate sensitivity, mortgage renewal, liquidity</span>"
+        f"</div></div>",
+        unsafe_allow_html=True,
+    )
+
+    # Filter to show
+    pq_filter_col, _ = st.columns([1, 3])
+    with pq_filter_col:
+        pq_tier_filter = st.selectbox(
+            "Show",
+            ["🔴 High Priority Only", "🔴🟡 High + Medium", "All Clients"],
+            index=1,
+            key="pq_tier_filter",
+            label_visibility="collapsed",
+        )
+
+    if pq_tier_filter == "🔴 High Priority Only":
+        pq_show = pq_df[pq_df["tier"] == "High"]
+    elif pq_tier_filter == "🔴🟡 High + Medium":
+        pq_show = pq_df[pq_df["tier"].isin(["High", "Medium"])]
+    else:
+        pq_show = pq_df
+
+    display_pq = pq_show[["icon", "name", "triage_score", "top_reason",
+                            "credit_score", "dti", "missed", "renewal", "employment"]].copy()
+    display_pq.columns = ["", "Name", "Score", "Top Signal",
+                           "Credit", "DTI", "Missed Pmts", "Renewal", "Employment"]
+
+    selection = st.dataframe(
+        display_pq,
+        use_container_width=True,
+        hide_index=True,
+        height=360,
+        on_select="rerun",
+        selection_mode="single-row",
+    )
+
+    # Navigate to selected client's Macro Stress
+    selected_rows = selection.selection.rows if hasattr(selection, "selection") else []
+    if selected_rows:
+        selected_idx = selected_rows[0]
+        selected_id  = pq_show.iloc[selected_idx]["id"]
+        st.session_state["selected_customer_id"] = selected_id
+        st.session_state["current_page"] = "Client Profile"
+        st.session_state["active_client_tab"] = "7 Pillars"
+        st.session_state["selected_pillar"] = "macro-financial"
+        st.rerun()
+
+    st.markdown("<div style='height:16px'></div>", unsafe_allow_html=True)
+
+    # ── CLIENT DIRECTORY ──────────────────────────────────────────────────────
     section_title("Client Directory")
 
     ALL_EMP = sorted(df.employment.unique().tolist())
