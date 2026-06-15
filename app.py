@@ -1100,7 +1100,7 @@ PILLAR_DEFS = [
     },
     {
         "slug": "client-goal",
-        "title": "Client Goal",
+        "title": "Financial Goal",
         "eyebrow": "Pillar 4",
         "description": "Goal counts, progress, and advisory planning context.",
     },
@@ -1111,20 +1111,14 @@ PILLAR_DEFS = [
         "description": "Next-best-product and activation opportunities for the advisor.",
     },
     {
-        "slug": "summary",
-        "title": "Summary",
-        "eyebrow": "Pillar 6",
-        "description": "Advisor-ready synthesis of relationship, usage, and opportunity signals.",
-    },
-    {
         "slug": "macro-financial",
         "title": "Macro Stress",
-        "eyebrow": "Pillar 7",
+        "eyebrow": "Pillar 6",
         "description": "Rate stress test, inflation sensitivity, and macro risk overlay for this client.",
     },
 ]
 PILLAR_DEF_MAP = {pillar["slug"]: pillar for pillar in PILLAR_DEFS}
-CLIENT_PROFILE_TABS = ["Overview", "Transactions", "Loans", "Analytics", "7 Pillars"]
+CLIENT_PROFILE_TABS = ["Overview", "Transactions", "Loans", "Analytics", "6 Pillars"]
 CURRENT_PAGE_KEY = "current_page"
 MAIN_NAV_WIDGET_KEY = "main_nav_widget"
 VIEW_OPTIONS = [
@@ -1177,11 +1171,11 @@ def ensure_navigation_state():
         query_pillar = str(query_pillar).strip().lower()
         if query_pillar in PILLAR_DEF_MAP or query_pillar == "overview":
             st.session_state[CURRENT_PAGE_KEY] = "Client Profile"
-            st.session_state["active_client_tab"] = "7 Pillars"
+            st.session_state["active_client_tab"] = "6 Pillars"
             st.session_state["selected_pillar"] = query_pillar
         clear_pillar_query_param()
 
-    if st.session_state["active_client_tab"] != "7 Pillars":
+    if st.session_state["active_client_tab"] != "6 Pillars":
         st.session_state["selected_pillar"] = "overview"
 
     if st.session_state["selected_customer_id"] not in cust_index and default_customer_id is not None:
@@ -1206,14 +1200,14 @@ def set_main_page(page):
 def set_client_profile_tab(tab_name):
     st.session_state[CURRENT_PAGE_KEY] = "Client Profile"
     st.session_state["active_client_tab"] = tab_name
-    if tab_name != "7 Pillars":
+    if tab_name != "6 Pillars":
         st.session_state["selected_pillar"] = "overview"
         clear_pillar_query_param()
 
 
 def set_selected_pillar(pillar_slug):
     st.session_state[CURRENT_PAGE_KEY] = "Client Profile"
-    st.session_state["active_client_tab"] = "7 Pillars"
+    st.session_state["active_client_tab"] = "6 Pillars"
     st.session_state["selected_pillar"] = pillar_slug
     clear_pillar_query_param()
 
@@ -1306,7 +1300,7 @@ def pillar_link_card_html(title, slug, eyebrow, description, rows):
 def pillar_detail_header_html(title, customer, effective_date=None):
     return (
         f"<div class='pillar-detail-header'>"
-        f"<div class='pillar-detail-kicker'>Client Profile / 7 Pillars</div>"
+        f"<div class='pillar-detail-kicker'>Client Profile / 6 Pillars</div>"
         f"<div class='pillar-detail-title'>{escape(title)}</div>"
         f"<div class='pillar-detail-subtitle'>{escape(customer['name'])} · {escape(customer['id'])}"
         + (f" · Business effective date {escape(str(effective_date))}" if effective_date else "")
@@ -1332,8 +1326,8 @@ def build_bns_advisor_insight(customer):
 
 
 def render_macro_financial_detail(customer):
-    """Pillar 7 — per-client macro financial stress detail."""
-    if st.button("← Back to 7 Pillars Overview", key="back_to_pillars_macro_financial", type="secondary"):
+    """Pillar 6 — per-client macro financial stress detail."""
+    if st.button("← Back to 6 Pillars Overview", key="back_to_pillars_macro_financial", type="secondary"):
         set_selected_pillar("overview")
         st.rerun()
 
@@ -1808,7 +1802,7 @@ def render_macro_financial_detail(customer):
 
 
 def render_placeholder_pillar_detail(customer, title):
-    if st.button("← Back to 7 Pillars Overview", key=f"back_to_pillars_{title}", type="secondary"):
+    if st.button("← Back to 6 Pillars Overview", key=f"back_to_pillars_{title}", type="secondary"):
         set_selected_pillar("overview")
         st.rerun()
     st.markdown(pillar_detail_header_html(title, customer), unsafe_allow_html=True)
@@ -1818,7 +1812,7 @@ def render_placeholder_pillar_detail(customer, title):
             body_html=(
                 f"<div style='font-size:0.84rem;color:{DARK};line-height:1.6'>"
                 f"Detailed view for {escape(title)} is reserved and ready for expansion. "
-                f"For now, return to the 7 Pillars overview to navigate to another pillar.</div>"
+                f"For now, return to the 6 Pillars overview to navigate to another pillar.</div>"
             ),
         ),
         unsafe_allow_html=True,
@@ -1902,7 +1896,7 @@ def render_bns_relationships_detail(customer):
         f"{flag_badge}</div>"
     )
 
-    if st.button("← Back to 7 Pillars Overview", key="back_to_pillars_bns_relationships", type="secondary"):
+    if st.button("← Back to 6 Pillars Overview", key="back_to_pillars_bns_relationships", type="secondary"):
         set_selected_pillar("overview")
         st.rerun()
     st.markdown(pillar_detail_header_html("BNS Relationships", customer, effective_date), unsafe_allow_html=True)
@@ -2115,7 +2109,7 @@ def build_flow_advisor_insight(customer):
 
 
 def render_flow_of_fund_detail(customer):
-    if st.button("← Back to 7 Pillars Overview", key="back_to_pillars_flow_of_fund", type="secondary"):
+    if st.button("← Back to 6 Pillars Overview", key="back_to_pillars_flow_of_fund", type="secondary"):
         set_selected_pillar("overview")
         st.rerun()
 
@@ -2458,7 +2452,7 @@ def build_account_usage_insight(customer, total_spend_30d):
 
 
 def render_account_usage_detail(customer):
-    if st.button("← Back to 7 Pillars Overview", key="back_to_pillars_account_usage", type="secondary"):
+    if st.button("← Back to 6 Pillars Overview", key="back_to_pillars_account_usage", type="secondary"):
         set_selected_pillar("overview")
         st.rerun()
 
@@ -2938,7 +2932,7 @@ def build_financial_goal_insight(customer, goals):
 
 
 def render_financial_goal_detail(customer):
-    if st.button("← Back to 7 Pillars Overview", key="back_to_pillars_financial_goal", type="secondary"):
+    if st.button("← Back to 6 Pillars Overview", key="back_to_pillars_financial_goal", type="secondary"):
         set_selected_pillar("overview")
         st.rerun()
 
@@ -3997,7 +3991,7 @@ if view == "Portfolio Overview":
         selected_id  = pq_show.iloc[selected_idx]["id"]
         st.session_state["selected_customer_id"] = selected_id
         st.session_state["current_page"] = "Client Profile"
-        st.session_state["active_client_tab"] = "7 Pillars"
+        st.session_state["active_client_tab"] = "6 Pillars"
         st.session_state["selected_pillar"] = "macro-financial"
         st.rerun()
 
@@ -4365,17 +4359,16 @@ elif view == "Client Profile":
             )
 
     # ── 6 PILLARS ────────────────────────────────────────────────────────────
-    elif active_client_tab == "7 Pillars":
+    elif active_client_tab == "6 Pillars":
         pillar_route = get_pillar_route()
 
         if pillar_route == "overview":
-            section_title("7 Pillars Overview")
+            section_title("6 Pillars Overview")
 
             flow = infer_flow_metrics(c)
             usage = infer_account_usage(c)
             goals = infer_goal_summary(c)
             offers = build_offer_suggestions(c)
-            summary = build_advisor_summary(c)
 
             overview_cards = [
                 pillar_link_card_html(
@@ -4433,20 +4426,9 @@ elif view == "Client Profile":
                         ("Savings Status", usage["savings"]),
                     ],
                 ),
-                pillar_link_card_html(
-                    "Summary",
-                    "summary",
-                    "Pillar 6",
-                    "Advisor-ready synthesis of relationship, usage, and opportunity signals.",
-                    [
-                        ("Risk Tier", c["risk_tier"]),
-                        ("Primary Segment", safe_text(customer_field(c, "primary_segment"))),
-                        ("Advisor", safe_text(customer_field(c, "note_advisor_name", "advisor_name"))),
-                    ],
-                ),
             ]
 
-            # P7 — compute preview values for the card
+            # P6 — compute preview values for the card
             _sdf = get_stress_df()
             _cbase = _sdf[(_sdf["id"] == c["id"]) & (_sdf["scenario"] == "Base")]
             if not _cbase.empty:
@@ -4460,7 +4442,7 @@ elif view == "Client Profile":
                 pillar_link_card_html(
                     "Macro Stress",
                     "macro-financial",
-                    "Pillar 7",
+                    "Pillar 6",
                     "Rate stress test, inflation sensitivity, and macro risk overlay for this client.",
                     [
                         ("Macro Risk Score", f"{_p7_score:.0f}/100"),
@@ -4484,8 +4466,6 @@ elif view == "Client Profile":
             render_financial_goal_detail(c)
         elif pillar_route == "offer":
             render_placeholder_pillar_detail(c, "Offer Detail")
-        elif pillar_route == "summary":
-            render_placeholder_pillar_detail(c, "Summary Detail")
         elif pillar_route == "macro-financial":
             render_macro_financial_detail(c)
 
