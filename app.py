@@ -5664,7 +5664,7 @@ elif view == "AI Assistant":
         risk_c    = {"Low": SUCCESS, "Medium": WARNING, "High": DANGER}.get(risk_tier, MUTED)
         dig_badge = (f"<span style='font-size:0.62rem;font-weight:600;color:#3b82f6;"
                      f"background:rgba(59,130,246,0.10);border:1px solid rgba(59,130,246,0.20);"
-                     f"border-radius:20px;padding:2px 8px;margin-left:6px'>📱 Digital</span>"
+                     f"border-radius:20px;padding:2px 8px;margin-left:6px'>Digital</span>"
                      if digital else "")
         prod_str  = ", ".join(products) if products else "None"
 
