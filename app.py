@@ -4028,49 +4028,79 @@ def ai_chat(system: str, user: str, model: str = OR_MODEL, max_tokens: int = 150
 # VAULT QUERY HELPERS
 # ─────────────────────────────────────────────────────────────────────────────
 
+def _build_agent_context(tokens: list[str]) -> str:
+    """Build agent context for tokens, augmenting vault summaries with credit
+    score and risk tier from cust_index (which the vault CSV does not contain)."""
+    parts = []
+    for t in tokens:
+        summary = vault.agent_summary_text(t)
+        if not summary:
+            continue
+        cust_id = vault.id_for_token(t)
+        if cust_id:
+            derived = cust_index.get(cust_id, {})
+            credit  = derived.get("credit_score")
+            risk    = derived.get("risk_tier")
+            rscore  = derived.get("risk_score")
+            income  = derived.get("annual_income")
+            dti     = derived.get("debt_to_income_ratio")
+            if credit  is not None: summary += f"\nCredit score: {credit}"
+            if risk    is not None: summary += f"\nRisk tier: {risk}" + (f" (score: {rscore})" if rscore is not None else "")
+            if income  is not None: summary += f"\nAnnual income: ${income:,.0f}"
+            if dti     is not None: summary += f"\nDebt-to-income ratio: {dti:.1%}"
+        parts.append(summary)
+    return "\n\n---\n\n".join(parts)
+
+
 def vault_query(question: str):
     """
-    Two-phase vault retrieval:
-    1. Find relevant customers by name match (priority) + keyword scoring.
-    2. Display their full records as cards directly in the chat (to the user).
-    3. Give the agent their non-sensitive fields so it can provide real analysis.
-
-    The agent never sees names or financial figures — but the user gets the
-    full resolved records shown right in the conversation.
+    Smart retrieval:
+    - Name questions  → find the specific customer, show their card, answer with full data
+    - Keyword questions → only show cards when meaningful matches exist (score > 0)
+    - General questions → no cards, answer directly from AI knowledge
     """
     if not vault.is_loaded():
         return "⚠️ Vault not loaded.", []
 
-    # Phase 1 — name-match first (handles "tell me about Omar Abbas")
+    # Phase 1 — name match (e.g. "what is Nicole's credit score")
     name_hits = vault.search_by_name(question)
 
-    # Phase 2 — keyword scoring on summaries for segment/goal/product questions
-    keyword_hits = vault.search_by_keyword(question, n=6)
+    if name_hits:
+        # Specific person found — use only name hits, no keyword noise
+        top_tokens = name_hits[:5]
+        context = _build_agent_context(top_tokens)
+        system = (
+            "You are a senior banking advisor at Scotiabank. "
+            "Answer the advisor's question directly using the customer data below. "
+            "Be specific — if asked for a number like credit score or income, state it plainly. "
+            "Do not say you cannot retrieve information that is clearly present in the data."
+        )
+        user_msg = f"Customer data:\n\n{context}\n\nQuestion: {question}"
 
-    # Merge: name hits take priority, then keyword hits, deduped
-    seen = set()
-    top_tokens = []
-    for t in name_hits + keyword_hits:
-        if t not in seen:
-            seen.add(t)
-            top_tokens.append(t)
-        if len(top_tokens) >= 8:
-            break
+    else:
+        # Phase 2 — keyword scoring for segment/product/goal questions
+        keyword_hits, max_score = vault.search_by_keyword(question, n=6)
 
-    # Phase 3 — build agent context from non-sensitive fields only
-    context = vault.agent_context_for(top_tokens)
-
-    system = (
-        "You are a senior banking advisor at Scotiabank. "
-        "The user's question has been matched to customer records in the secure vault. "
-        "The customer data cards have already been displayed to the user. "
-        "Your job is to provide concise, insightful analysis of those customers "
-        "based on the summaries below — segment strategy, primacy gaps, product opportunities, "
-        "goal alignment, or engagement recommendations. "
-        "Do not repeat the raw data; focus on interpretation and advice. "
-        "Be direct, specific, and professional."
-    )
-    user_msg = f"Retrieved customer summaries:\n\n{context}\n\nAdvisor question: {question}"
+        if max_score == 0:
+            # No relevant customer records — answer as a general advisory question
+            top_tokens = []
+            system = (
+                "You are a senior banking advisor at Scotiabank. "
+                "Answer the advisor's question concisely and professionally. "
+                "Focus on banking strategy, primacy, product recommendations, or engagement tactics."
+            )
+            user_msg = f"Advisor question: {question}"
+        else:
+            # Meaningful keyword matches found — show cards and analyse
+            top_tokens = keyword_hits
+            context = _build_agent_context(top_tokens)
+            system = (
+                "You are a senior banking advisor at Scotiabank. "
+                "Customer records matching the advisor's question are shown below. "
+                "Provide concise analysis — segment strategy, primacy gaps, product opportunities, "
+                "or engagement recommendations. Be direct and specific."
+            )
+            user_msg = f"Matching customer data:\n\n{context}\n\nAdvisor question: {question}"
 
     with st.spinner("Analysing…"):
         text = ai_chat(system, user_msg, model=OR_FAST_MODEL, max_tokens=1500)

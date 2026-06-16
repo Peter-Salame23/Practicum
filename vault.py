@@ -213,48 +213,80 @@ def search_tokens(query: str) -> list[str]:
     return [t for t in _vault if q in t]
 
 
-def search_by_name(query: str) -> list[str]:
-    """Name search with priority tiers so 'Aaliyah Charles' finds Aaliyah Charles
-    specifically rather than flooding results with every Charles.
+_NAME_STOP_WORDS = {
+    "what", "is", "are", "the", "a", "an", "which", "who", "how", "their",
+    "tell", "me", "about", "find", "give", "show", "for", "with", "and",
+    "has", "have", "does", "did", "can", "could", "would", "should",
+    "his", "her", "this", "that", "these", "those", "my", "our", "your",
+    "client", "clients", "customer", "customers", "credit", "score",
+    "balance", "risk", "loan", "loans", "step", "steps", "away", "from",
+    "primacy", "goal", "product", "products", "advisor",
+}
 
-    Tier 1 — exact full-name match (returns immediately if found)
-    Tier 2 — ALL words in query appear in the name  (e.g. both 'Aaliyah' AND 'Charles')
-    Tier 3 — first name only match (fallback, capped at 5)
+
+def _name_words(query: str) -> list[str]:
+    """Extract candidate name tokens: strip possessives, filter stop words."""
+    words = []
+    for w in query.strip().lower().split():
+        w = re.sub(r"['\u2019]s$", "", w)   # strip  's  (Nicole's → nicole)
+        if w.endswith("s") and len(w) > 3:   # strip bare possessive s (nicoles → nicole)
+            candidate = w[:-1]
+            if candidate not in _NAME_STOP_WORDS:
+                words.append(candidate)
+                continue
+        if len(w) > 1 and w not in _NAME_STOP_WORDS:
+            words.append(w)
+    return words
+
+
+def search_by_name(query: str) -> list[str]:
+    """Name search with priority tiers.
+
+    Tier 1 — exact full-name match
+    Tier 2 — ALL filtered name-words appear in the name (e.g. 'Aaliyah' AND 'Charles')
+    Tier 3 — ANY single filtered name-word appears in the name (capped at 5)
+
+    Possessives are handled: 'nicoles' and "Nicole's" both match Nicole.
+    Common question words (what, is, credit, score…) are ignored.
     """
     q = query.strip().lower()
     if not q:
         return []
-    words = [w for w in q.split() if len(w) > 1]
+    words = _name_words(q)
+    if not words:
+        return []
 
-    exact, all_words, first_only = [], [], []
+    exact, all_words, any_word = [], [], []
     for token, row in _vault.items():
         name = str(row.get("customer_name", "")).lower()
         if name == q:
             exact.append(token)
-        elif all(w in name for w in words):
+        elif len(words) > 1 and all(w in name for w in words):
             all_words.append(token)
-        elif words and words[0] in name:
-            first_only.append(token)
+        elif any(w in name for w in words):
+            any_word.append(token)
 
     if exact:
         return exact
     if all_words:
         return all_words
-    return first_only[:5]
+    return any_word[:5]
 
 
-def search_by_keyword(question: str, n: int = 8) -> list[str]:
-    """Score tokens by how many question words appear in their summary text."""
+def search_by_keyword(question: str, n: int = 8) -> tuple[list[str], int]:
+    """Score tokens by how many question words appear in their summary text.
+    Returns (tokens, max_score). max_score == 0 means no relevant matches found."""
     q_words = [w for w in question.lower().split() if len(w) > 3]
     if not q_words:
-        return list(_vault.keys())[:n]
+        return [], 0
     scored = []
     for t in _vault:
         summary = agent_summary_text(t)
         hits = sum(1 for w in q_words if w in summary.lower())
         scored.append((hits, t))
     scored.sort(key=lambda x: -x[0])
-    return [t for _, t in scored[:n]]
+    max_score = scored[0][0] if scored else 0
+    return [t for _, t in scored[:n]], max_score
 
 
 def agent_context_for(tokens: list[str]) -> str:
