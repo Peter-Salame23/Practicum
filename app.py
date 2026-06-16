@@ -102,6 +102,38 @@ st.markdown(
     '<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">',
     unsafe_allow_html=True,
 )
+# ─────────────────────────────────────────────────────────────────────────────
+# DESIGN TOKENS
+# ─────────────────────────────────────────────────────────────────────────────
+
+PRIMARY = "#EC111A"
+DARK    = "#0f172a"
+SURFACE = "#ffffff"
+BG      = "#f1f5f9"
+MUTED   = "#64748b"
+BORDER  = "#e2e8f0"
+SUCCESS = "#10b981"
+WARNING = "#f59e0b"
+DANGER  = "#ef4444"
+
+RISK_COLORS = {"Low": SUCCESS, "Medium": WARNING, "High": DANGER}
+RISK_BG     = {
+    "Low":    "rgba(16,185,129,0.12)",
+    "Medium": "rgba(245,158,11,0.12)",
+    "High":   "rgba(239,68,68,0.12)",
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# GLOBAL STYLES
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Inject Google Fonts via link tag (more reliable than @import inside <style>)
+st.markdown(
+    '<link rel="preconnect" href="https://fonts.googleapis.com">'
+    '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>'
+    '<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">',
+    unsafe_allow_html=True,
+)
 
 st.markdown(f"""
 <style>
@@ -186,21 +218,26 @@ footer {{ visibility: hidden; }}
 
 /* ── METRIC CARDS ───────────────────────────────────────────────── */
 div[data-testid="metric-container"] {{
-  background: {SURFACE};
-  border: 1px solid {BORDER};
-  border-radius: 16px;
-  padding: 1.2rem 1.4rem 1rem;
-  box-shadow: 0 1px 2px rgba(0,0,0,0.04), 0 4px 14px rgba(0,0,0,0.03);
-  position: relative;
-  overflow: hidden;
+  background: {SURFACE} !important;
+  border: 1px solid {BORDER} !important;
+  border-radius: 16px !important;
+  padding: 1.2rem 1.4rem 1rem !important;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.07), 0 1px 2px rgba(0,0,0,0.05) !important;
+  position: relative !important;
+  overflow: hidden !important;
+  transition: box-shadow 0.15s ease, transform 0.15s ease !important;
+}}
+div[data-testid="metric-container"]:hover {{
+  box-shadow: 0 6px 20px rgba(0,0,0,0.1), 0 2px 4px rgba(0,0,0,0.06) !important;
+  transform: translateY(-1px) !important;
 }}
 div[data-testid="metric-container"]::before {{
-  content: '';
-  position: absolute;
-  inset: 0 0 auto 0;
-  height: 3px;
-  background: linear-gradient(90deg, {PRIMARY} 0%, #ff6b72 100%);
-  border-radius: 16px 16px 0 0;
+  content: '' !important;
+  position: absolute !important;
+  inset: 0 0 auto 0 !important;
+  height: 3px !important;
+  background: linear-gradient(90deg, {PRIMARY} 0%, #ff6b72 100%) !important;
+  border-radius: 16px 16px 0 0 !important;
 }}
 div[data-testid="metric-container"] label {{
   color: {MUTED} !important;
@@ -227,7 +264,62 @@ div[data-testid="metric-container"] [data-testid="stMetricDelta"] {{
 .block-container th, .block-container span, .block-container label,
 .block-container h1, .block-container h2, .block-container h3,
 .block-container h4, .block-container div {{ color: {DARK}; }}
+
+/* ── CHAT MESSAGES ──────────────────────────────────────────────── */
+[data-testid="stChatMessage"] {{
+  background: {SURFACE} !important;
+  border: 1px solid {BORDER} !important;
+  border-radius: 14px !important;
+  padding: 0.9rem 1.1rem !important;
+  margin-bottom: 0.65rem !important;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05) !important;
+}}
 [data-testid="stChatMessage"] * {{ color: {DARK} !important; }}
+
+/* Hide the text-based Material icon avatars (face / smart_toy) */
+[data-testid="stChatMessage"] [data-testid="chatAvatarIcon-user"] span.material-symbols-rounded,
+[data-testid="stChatMessage"] [data-testid="chatAvatarIcon-assistant"] span.material-symbols-rounded,
+[data-testid="stChatMessage"] [data-testid="chatAvatarIcon-user"] span,
+[data-testid="stChatMessage"] [data-testid="chatAvatarIcon-assistant"] span {{
+  font-size: 0 !important;
+  line-height: 0 !important;
+}}
+
+/* Replace with clean pill avatars */
+[data-testid="stChatMessage"] [data-testid="chatAvatarIcon-user"] {{
+  background: {PRIMARY}15 !important;
+  border: 1.5px solid {PRIMARY}30 !important;
+  border-radius: 8px !important;
+  width: 30px !important;
+  min-width: 30px !important;
+  height: 30px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  overflow: hidden !important;
+}}
+[data-testid="stChatMessage"] [data-testid="chatAvatarIcon-user"]::after {{
+  content: '👤' !important;
+  font-size: 0.85rem !important;
+  line-height: 1 !important;
+}}
+[data-testid="stChatMessage"] [data-testid="chatAvatarIcon-assistant"] {{
+  background: #3b82f615 !important;
+  border: 1.5px solid #3b82f630 !important;
+  border-radius: 8px !important;
+  width: 30px !important;
+  min-width: 30px !important;
+  height: 30px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  overflow: hidden !important;
+}}
+[data-testid="stChatMessage"] [data-testid="chatAvatarIcon-assistant"]::after {{
+  content: '🏦' !important;
+  font-size: 0.85rem !important;
+  line-height: 1 !important;
+}}
 
 /* ── CHART CONTAINERS ───────────────────────────────────────────── */
 div[data-testid="stPlotlyChart"] {{
@@ -711,6 +803,25 @@ def load_customers():
 
     return customers
 
+def _customer_to_doc(c):
+    """Serialize a customer record to a plain-text document for embedding."""
+    loans_text = " ".join(
+        f"{l.get('type','')} loan ${l.get('amount',0):,} at {l.get('rate',0)}% APR status {l.get('status','')}"
+        for l in c.get("loans", [])
+    )
+    return (
+        f"Customer {c['id']} name {c['name']} age {c['age']} gender {c['gender']} "
+        f"employment {c['employment_status']} job {c['job_title']} "
+        f"annual income ${c['annual_income']:,} "
+        f"credit score {c['credit_score']} risk tier {c['risk_tier']} risk score {c['risk_score']} "
+        f"total debt ${c['total_debt']:,} DTI {c['debt_to_income_ratio']:.2f} "
+        f"checking ${c['checking_balance']:,} savings ${c['savings_balance']:,} "
+        f"total assets ${c['total_assets']:,} "
+        f"late payments {c['num_late_payments']} bankruptcy {c['bankruptcy_history']} "
+        f"loans: {loans_text}"
+    )
+
+
 @st.cache_resource
 def load_vault():
     """Load vault from xlsx or csv, whichever exists."""
@@ -763,6 +874,59 @@ def page_header(title, subtitle=None, badge=None, badge_color=None):
           </div>
           {sub_html}
         </div>""",
+        unsafe_allow_html=True,
+    )
+
+
+def metric_row(metrics: list):
+    """
+    Render a row of metric cards purely in HTML — bypasses st.metric() CSS issues.
+    metrics: list of (label, value) or (label, value, delta, delta_color) tuples
+    delta_color: 'normal' (green=good) or 'inverse' (red=good)
+    """
+    cards = []
+    for item in metrics:
+        label = item[0]
+        value = item[1]
+        delta = item[2] if len(item) > 2 else None
+        dinv  = item[3] if len(item) > 3 else "normal"
+
+        delta_html = ""
+        if delta is not None:
+            # Determine arrow + color
+            is_pos = str(delta).startswith("+") or (
+                isinstance(delta, (int, float)) and delta > 0
+            )
+            is_neg = str(delta).startswith("-") or (
+                isinstance(delta, (int, float)) and delta < 0
+            )
+            if dinv == "inverse":
+                dcolor = DANGER if is_pos else (SUCCESS if is_neg else MUTED)
+            else:
+                dcolor = SUCCESS if is_pos else (DANGER if is_neg else MUTED)
+            arrow = "▲" if is_pos else ("▼" if is_neg else "")
+            delta_html = (
+                f"<div style='font-size:0.72rem;font-weight:600;color:{dcolor};"
+                f"margin-top:3px'>{arrow} {delta}</div>"
+            )
+
+        cards.append(
+            f"<div style='flex:1;background:{SURFACE};border:1px solid {BORDER};"
+            f"border-radius:14px;padding:1.1rem 1.3rem 0.95rem;position:relative;"
+            f"overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.06),0 1px 2px rgba(0,0,0,0.04);"
+            f"transition:box-shadow 0.15s,transform 0.15s'>"
+            f"<div style='position:absolute;inset:0 0 auto 0;height:3px;"
+            f"background:linear-gradient(90deg,{PRIMARY} 0%,#ff6b72 100%);"
+            f"border-radius:14px 14px 0 0'></div>"
+            f"<div style='font-size:0.63rem;font-weight:700;color:{MUTED};"
+            f"text-transform:uppercase;letter-spacing:0.09em;margin-bottom:6px'>{label}</div>"
+            f"<div style='font-size:1.5rem;font-weight:700;color:{DARK};line-height:1.15'>{value}</div>"
+            f"{delta_html}"
+            f"</div>"
+        )
+
+    st.markdown(
+        f"<div style='display:flex;gap:14px;margin-bottom:1.2rem'>{''.join(cards)}</div>",
         unsafe_allow_html=True,
     )
 
@@ -1384,10 +1548,10 @@ PILLAR_DEFS = [
         "description": "Next-best-product and activation opportunities for the advisor.",
     },
     {
-        "slug": "summary",
-        "title": "Summary",
+        "slug": "macro-financial",
+        "title": "Macro Stress",
         "eyebrow": "Pillar 6",
-        "description": "Advisor-ready synthesis of relationship, usage, and opportunity signals.",
+        "description": "Rate stress test, inflation sensitivity, and macro risk overlay for this client.",
     },
 ]
 PILLAR_DEF_MAP = {pillar["slug"]: pillar for pillar in PILLAR_DEFS}
@@ -1603,6 +1767,482 @@ def build_bns_advisor_insight(customer):
     else:
         insight += " Relationship signals are stable; focus on deepening product usage and retention."
     return insight
+
+
+def render_macro_financial_detail(customer):
+    """Pillar 6 — per-client macro financial stress detail."""
+    if st.button("← Back to 6 Pillars Overview", key="back_to_pillars_macro_financial", type="secondary"):
+        set_selected_pillar("overview")
+        st.rerun()
+
+    st.markdown(pillar_detail_header_html("Macro Stress", customer), unsafe_allow_html=True)
+
+    # ── Pre-compute all values ─────────────────────────────────────────────
+    stress_df = get_stress_df()
+    c_stress  = stress_df[stress_df["id"] == customer["id"]].copy()
+    base_row  = c_stress[c_stress["scenario"] == "Base"].iloc[0] if not c_stress.empty else None
+
+    if base_row is None:
+        st.info("No stress data available for this client.")
+        return
+
+    scenario_order  = ["Base", "+25 bps", "+50 bps", "+100 bps"]
+    c_stress_sorted = c_stress.copy()
+    c_stress_sorted["scenario"] = pd.Categorical(c_stress_sorted["scenario"], categories=scenario_order, ordered=True)
+    c_stress_sorted = c_stress_sorted.sort_values("scenario")
+
+    monthly_income  = float(customer.get("annual_income", 0) or 0) / 12
+    var_loans       = int(base_row["variable_loan_count"])
+    base_disp       = float(base_row["disposable_income"])
+    base_pti        = float(base_row["pti"])
+    total_debt      = float(customer.get("total_debt", 0) or 0)
+    checking        = float(customer.get("checking_balance", 0) or 0)
+    savings         = float(customer.get("savings_balance", 0) or 0)
+    liquid_assets   = checking + savings
+    base_payment    = float(base_row["stressed_payment"])
+
+    # Liquidity runway (months of debt payments covered by liquid assets)
+    runway_months   = liquid_assets / base_payment if base_payment > 0 else 99
+
+    # Inflation-sensitive spending
+    inflation_cats  = {"Groceries", "Utilities", "Rent/Mortgage", "Transport"}
+    txns            = customer.get("transactions", [])
+    inf_spend       = {}
+    for t in txns:
+        cat = t.get("category", "")
+        amt = float(t.get("amount", 0) or 0)
+        if cat in inflation_cats and amt < 0:
+            inf_spend[cat] = inf_spend.get(cat, 0) + abs(amt)
+    inf_total       = sum(inf_spend.values())
+    inf_pct         = inf_total / monthly_income * 100 if monthly_income > 0 else 0
+
+    # Mortgage renewal check
+    active_loans    = [l for l in customer.get("loans", []) if l.get("status") == "Active"]
+    mortgages       = [l for l in active_loans if l.get("type") == "Mortgage"]
+    renewing_soon   = []
+    from datetime import date as _date, timedelta as _timedelta
+    today           = _date.today()
+    for m in mortgages:
+        end_str = m.get("end_date") or m.get("maturity_date") or ""
+        if end_str:
+            try:
+                end_dt = _date.fromisoformat(str(end_str)[:10])
+                months_to_end = (end_dt - today).days / 30
+                if 0 < months_to_end <= 12:
+                    renewing_soon.append((m, months_to_end, end_dt))
+            except Exception:
+                pass
+
+    # +50bps scenario row for action panel
+    row_50 = c_stress[c_stress["scenario"] == "+50 bps"]
+    row_50 = row_50.iloc[0] if not row_50.empty else base_row
+    payment_delta_50 = float(row_50["stressed_payment"]) - base_payment
+    disp_50          = float(row_50["disposable_income"])
+
+    # ── Additional signals from client data ───────────────────────────────
+    dti              = float(customer.get("debt_to_income_ratio", 0) or 0)
+    credit_score     = int(customer.get("credit_score", 700) or 700)
+    missed_payments  = int(customer.get("num_late_payments", 0) or 0)
+    bankruptcy       = bool(customer.get("bankruptcy_history", False))
+
+    # Missed payments on any active loan
+    loans_with_missed = [
+        l for l in active_loans
+        if int(l.get("missed_payments", 0) or 0) > 0
+    ]
+    total_missed = sum(int(l.get("missed_payments", 0) or 0) for l in active_loans)
+
+    # High-rate personal debt (> 9% APR)
+    high_rate_loans = [
+        l for l in active_loans
+        if float(l.get("rate", 0) or 0) >= 9.0
+        and l.get("type") in ("Personal", "Line of Credit")
+    ]
+    high_rate_balance = sum(float(l.get("amount", 0) or 0) for l in high_rate_loans)
+    avg_high_rate     = (
+        sum(float(l.get("rate", 0)) for l in high_rate_loans) / len(high_rate_loans)
+        if high_rate_loans else 0
+    )
+
+    # ── Macro context banner ───────────────────────────────────────────────
+    st.markdown(
+        f"<div style='background:#8b5cf608;border:1px solid #8b5cf620;border-radius:12px;"
+        f"padding:0.75rem 1.1rem;margin-bottom:1.1rem;font-size:0.81rem;color:{MUTED}'>"
+        f"📡 <b style='color:{DARK}'>Live — {MACRO_CONTEXT['snapshot_date']}</b> · "
+        f"BoC Rate <b>{MACRO_CONTEXT['boc_policy_rate']}%</b> · "
+        f"Prime <b>{MACRO_CONTEXT['prime_rate']}%</b> · "
+        f"CPI <b>{MACRO_CONTEXT['cpi_yoy']}%</b> · "
+        f"Unemployment <b>{MACRO_CONTEXT['unemployment_rate']}%</b> · "
+        f"HPI <b>{MACRO_CONTEXT['hpi_yoy']:+.1f}%</b> · "
+        f"<i style='color:#8b5cf6'>{MACRO_CONTEXT.get('data_source','')}</i></div>",
+        unsafe_allow_html=True,
+    )
+
+    # ══════════════════════════════════════════════════════════════════════
+    # ADVISOR ACTION PANEL
+    # ══════════════════════════════════════════════════════════════════════
+
+    # Compute per-card urgency first (for summary bar)
+    if var_loans > 0:
+        if payment_delta_50 > 300:   rate_urgency, rate_color = "Action", DANGER
+        elif payment_delta_50 > 100: rate_urgency, rate_color = "Monitor", WARNING
+        else:                         rate_urgency, rate_color = "OK", SUCCESS
+    else:
+        rate_urgency, rate_color = "OK", SUCCESS
+
+    runway_cap = min(runway_months, 24)   # cap display at 24 months
+    if runway_months < 3:   liq_urgency, liq_color = "Action", DANGER
+    elif runway_months < 6: liq_urgency, liq_color = "Monitor", WARNING
+    else:                   liq_urgency, liq_color = "OK", SUCCESS
+
+    if renewing_soon:       ren_urgency, ren_color = "Action", DANGER
+    elif mortgages:         ren_urgency, ren_color = "OK", SUCCESS
+    else:                   ren_urgency, ren_color = "N/A", MUTED
+
+    if inf_pct > 30:        inf_urgency, inf_color = "Action", DANGER
+    elif inf_pct > 20:      inf_urgency, inf_color = "Monitor", WARNING
+    else:                   inf_urgency, inf_color = "OK", SUCCESS
+
+    # ── Helper: compact action card ────────────────────────────────────
+    def action_card(icon, title, urgency_color, urgency_label,
+                    stat_pairs, one_liner, talking_point):
+        badge_bg = urgency_color + "18"
+        stat_cells = []
+        for i, (l, v) in enumerate(stat_pairs):
+            border = f"border-right:1px solid {BORDER};" if i < len(stat_pairs) - 1 else ""
+            stat_cells.append(
+                f"<div style='flex:1;{border}text-align:center;padding:0.65rem 0.5rem'>"
+                f"<div style='font-size:1.55rem;font-weight:800;color:{urgency_color};"
+                f"line-height:1.1;letter-spacing:-0.5px'>{v}</div>"
+                f"<div style='font-size:0.7rem;text-transform:uppercase;letter-spacing:0.07em;"
+                f"color:{MUTED};margin-top:5px;font-weight:600'>{l}</div>"
+                f"</div>"
+            )
+        return (
+            f"<div style='background:{SURFACE};border:1px solid {urgency_color}35;"
+            f"border-top:3px solid {urgency_color};border-radius:14px;"
+            f"padding:0.9rem 1rem 0.85rem;height:100%;"
+            f"box-shadow:0 2px 8px rgba(0,0,0,0.05)'>"
+            f"<div style='display:flex;align-items:center;gap:6px;margin-bottom:10px'>"
+            f"<span style='font-size:1rem'>{icon}</span>"
+            f"<span style='font-weight:700;font-size:0.88rem;color:{DARK};flex:1'>{title}</span>"
+            f"<span style='background:{badge_bg};color:{urgency_color};"
+            f"font-size:0.6rem;font-weight:800;padding:2px 9px;border-radius:20px;"
+            f"text-transform:uppercase;letter-spacing:0.06em'>{urgency_label}</span>"
+            f"</div>"
+            f"<div style='display:flex;background:{BG};border-radius:10px;margin-bottom:10px;"
+            f"border:1px solid {BORDER};overflow:hidden'>{''.join(stat_cells)}</div>"
+            f"<div style='font-size:0.8rem;color:{DARK};margin-bottom:8px;line-height:1.45'>{one_liner}</div>"
+            f"<div style='background:#f5f6fa;border-radius:8px;padding:0.45rem 0.7rem;"
+            f"border-left:3px solid {urgency_color}50'>"
+            f"<span style='font-size:0.67rem;font-weight:700;color:{MUTED};"
+            f"text-transform:uppercase;letter-spacing:0.06em'>💬 Say this</span>"
+            f"<div style='font-size:0.78rem;color:{DARK};margin-top:3px;font-style:italic'>"
+            f"{talking_point}</div>"
+            f"</div></div>"
+        )
+
+    # Build 4 cards
+    # Card 1 — Rate
+    if var_loans > 0:
+        c1 = action_card(
+            icon="📈", title="Rate Risk",
+            urgency_color=rate_color, urgency_label=rate_urgency,
+            stat_pairs=[
+                ("Variable Loans", str(var_loans)),
+                ("+50bps Impact", f"+${payment_delta_50:,.0f}/mo"),
+                ("Disposable After", f"${disp_50:,.0f}"),
+            ],
+            one_liner=f"{var_loans} variable-rate loan(s) exposed to BoC moves. +50bps adds <b>${payment_delta_50:,.0f}/mo</b> to payments.",
+            talking_point=f"'Your mortgage is variable rate — want to look at what locking in would cost vs. the uncertainty of staying variable?'",
+        )
+    else:
+        c1 = action_card(
+            icon="✅", title="Rate Risk",
+            urgency_color=rate_color, urgency_label=rate_urgency,
+            stat_pairs=[("Variable Loans", "0"), ("Fixed Rate", "All"), ("BoC Impact", "None")],
+            one_liner="All loans are fixed-rate. No exposure to BoC rate changes.",
+            talking_point="'Your payments are locked in regardless of what BoC does — that's a solid position. Let's talk about where to put extra savings.'",
+        )
+
+    # Card 2 — Liquidity
+    runway_display = f"{runway_cap:.0f}mo" if runway_months <= 24 else "24mo+"
+    c2 = action_card(
+        icon="💧", title="Emergency Fund",
+        urgency_color=liq_color, urgency_label=liq_urgency,
+        stat_pairs=[
+            ("Liquid Assets", f"${liquid_assets:,.0f}"),
+            ("Runway", runway_display),
+            ("Target", "6 mo"),
+        ],
+        one_liner=(
+            f"<b>${liquid_assets:,.0f}</b> liquid covers <b>{runway_display}</b> of debt payments. "
+            + ("Below 3-month minimum — priority conversation." if runway_months < 3
+               else "Below 6-month target." if runway_months < 6
+               else "Above target — explore GIC/TFSA for idle cash.")
+        ),
+        talking_point=(
+            f"'You've got about {runway_display} of emergency coverage. Most advisors recommend 6 months — let's talk about whether that's the right target for you.'"
+            if runway_months < 6
+            else f"'Your emergency fund is in great shape. With rates where they are, it might be worth putting some of that cash into a GIC or TFSA to earn more.'"
+        ),
+    )
+
+    # Card 3 — Missed Payments / DTI / High-Rate Debt (pick most urgent)
+    if total_missed > 0:
+        ren_urgency, ren_color = "Action", DANGER
+        c3 = action_card(
+            icon="⚠️", title="Missed Payments",
+            urgency_color=ren_color, urgency_label=ren_urgency,
+            stat_pairs=[
+                ("Missed Pmts", str(total_missed)),
+                ("Loans Affected", str(len(loans_with_missed))),
+                ("Credit Score", str(credit_score)),
+            ],
+            one_liner=f"<b>{total_missed} missed payment(s)</b> across {len(loans_with_missed)} loan(s). Immediate outreach needed to prevent credit damage.",
+            talking_point=f"'I noticed there have been some missed payments on your account — I want to make sure we get ahead of this before it affects your credit score. Can we review your payment plan?'",
+        )
+    elif dti > 0.50:
+        ren_urgency, ren_color = "Action", DANGER
+        c3 = action_card(
+            icon="📊", title="Debt Load",
+            urgency_color=ren_color, urgency_label=ren_urgency,
+            stat_pairs=[
+                ("DTI", f"{dti:.0%}"),
+                ("Total Debt", f"${total_debt:,.0f}"),
+                ("Threshold", "50%"),
+            ],
+            one_liner=f"DTI of <b>{dti:.0%}</b> is above the 50% danger threshold. Client is over-leveraged — consolidation or debt reduction conversation needed.",
+            talking_point=f"'Your debt-to-income ratio is on the higher side at {dti:.0%}. Let's look at whether there's a way to restructure or reduce some of that debt load.'",
+        )
+    elif dti > 0.35:
+        ren_urgency, ren_color = "Monitor", WARNING
+        c3 = action_card(
+            icon="📊", title="Debt Load",
+            urgency_color=ren_color, urgency_label=ren_urgency,
+            stat_pairs=[
+                ("DTI", f"{dti:.0%}"),
+                ("Total Debt", f"${total_debt:,.0f}"),
+                ("Threshold", "35%"),
+            ],
+            one_liner=f"DTI of <b>{dti:.0%}</b> is above the comfortable 35% range. Monitor before recommending additional credit.",
+            talking_point=f"'Your debt level is manageable, but before taking on anything new I'd want to make sure your monthly obligations stay comfortable.'",
+        )
+    elif high_rate_loans:
+        ren_urgency, ren_color = "Monitor", WARNING
+        c3 = action_card(
+            icon="💳", title="High-Rate Debt",
+            urgency_color=ren_color, urgency_label=ren_urgency,
+            stat_pairs=[
+                ("Balance", f"${high_rate_balance:,.0f}"),
+                ("Avg Rate", f"{avg_high_rate:.1f}%"),
+                ("Loans", str(len(high_rate_loans))),
+            ],
+            one_liner=f"<b>${high_rate_balance:,.0f}</b> in high-rate debt at avg <b>{avg_high_rate:.1f}% APR</b>. Consolidation could reduce interest cost.",
+            talking_point=f"'You have some debt at higher interest rates — it might be worth looking at consolidating that into a lower-rate option to save on interest.'",
+        )
+    else:
+        ren_urgency, ren_color = "OK", SUCCESS
+        c3 = action_card(
+            icon="✅", title="Debt Health",
+            urgency_color=ren_color, urgency_label=ren_urgency,
+            stat_pairs=[
+                ("DTI", f"{dti:.0%}"),
+                ("Missed Pmts", "0"),
+                ("Status", "Healthy"),
+            ],
+            one_liner="Debt load is within normal range. No missed payments on record.",
+            talking_point="'Your debt position looks healthy — good discipline on payments. Let's talk about how to make the most of your current financial position.'",
+        )
+
+    # Card 4 — Credit Score Health + Inflation
+    if credit_score < 600 or bankruptcy:
+        inf_urgency, inf_color = "Action", DANGER
+        c4 = action_card(
+            icon="📉", title="Credit Health",
+            urgency_color=inf_color, urgency_label=inf_urgency,
+            stat_pairs=[
+                ("Credit Score", str(credit_score)),
+                ("Bankruptcy", "Yes" if bankruptcy else "No"),
+                ("Late Payments", str(missed_payments)),
+            ],
+            one_liner=f"Credit score of <b>{credit_score}</b> is below the 600 threshold. Limited product eligibility — focus on credit rebuilding.",
+            talking_point=f"'I want to talk about your credit score — at {credit_score} there are some products that aren't available to you right now, but there are concrete steps we can take to improve it.'",
+        )
+    elif credit_score < 670:
+        inf_urgency, inf_color = "Monitor", WARNING
+        c4 = action_card(
+            icon="📉", title="Credit Health",
+            urgency_color=inf_color, urgency_label=inf_urgency,
+            stat_pairs=[
+                ("Credit Score", str(credit_score)),
+                ("Target", "670+"),
+                ("Late Payments", str(missed_payments)),
+            ],
+            one_liner=f"Credit score of <b>{credit_score}</b> is below the 670 'good' threshold. May face higher rates on new products.",
+            talking_point=f"'Your credit score is at {credit_score} — getting above 670 would open up better rates on future borrowing. Let's talk about what moves the needle.'",
+        )
+    elif inf_total > 0:
+        monthly_inf_impact = inf_total * MACRO_CONTEXT["cpi_yoy"] / 100
+        if inf_pct > 30:        inf_urgency, inf_color = "Action", DANGER
+        elif inf_pct > 20:      inf_urgency, inf_color = "Monitor", WARNING
+        else:                   inf_urgency, inf_color = "OK", SUCCESS
+        c4 = action_card(
+            icon="🛒", title="Inflation Pressure",
+            urgency_color=inf_color, urgency_label=inf_urgency,
+            stat_pairs=[
+                ("Inflation Spend", f"${inf_total:,.0f}/mo"),
+                ("% of Income", f"{inf_pct:.0f}%"),
+                ("CPI Cost", f"+${monthly_inf_impact:,.0f}/mo"),
+            ],
+            one_liner=f"<b>{inf_pct:.0f}%</b> of income on inflation-sensitive items. CPI adds ~<b>${monthly_inf_impact:,.0f}/mo</b> in real cost.",
+            talking_point=f"'Groceries and utilities have gotten more expensive — about {inf_pct:.0f}% of your income goes there. Want to review your budget to make sure it still works?'",
+        )
+    else:
+        inf_urgency, inf_color = "OK", SUCCESS
+        c4 = action_card(
+            icon="✅", title="Credit & Spending",
+            urgency_color=inf_color, urgency_label=inf_urgency,
+            stat_pairs=[("Credit Score", str(credit_score)), ("Status", "Good"), ("", "")],
+            one_liner=f"Credit score of {credit_score} is in good standing. No immediate concerns.",
+            talking_point="'Your credit profile looks solid — let's make sure we're putting that to work with the right products.'",
+        )
+
+    # ── Render: summary bar + 2x2 grid ────────────────────────────────
+    all_colors = [rate_color, liq_color, ren_color, inf_color]
+    if DANGER in all_colors:
+        overall_label, overall_color, overall_icon = "Follow Up Required", DANGER, "🔴"
+    elif WARNING in all_colors:
+        overall_label, overall_color, overall_icon = "Monitor Closely", WARNING, "🟡"
+    else:
+        overall_label, overall_color, overall_icon = "No Immediate Action", SUCCESS, "🟢"
+
+    st.markdown(
+        f"<div style='background:{overall_color}10;border:1.5px solid {overall_color}40;"
+        f"border-radius:14px;padding:0.8rem 1.2rem;margin-bottom:1rem;"
+        f"display:flex;align-items:center;gap:12px'>"
+        f"<span style='font-size:1.4rem'>{overall_icon}</span>"
+        f"<div>"
+        f"<div style='font-weight:800;font-size:0.95rem;color:{overall_color}'>{overall_label}</div>"
+        f"<div style='font-size:0.75rem;color:{MUTED};margin-top:1px'>"
+        f"🎯 Advisor Action Panel — signals for your next client meeting</div>"
+        f"</div></div>",
+        unsafe_allow_html=True,
+    )
+
+    col_a, col_b = st.columns(2, gap="medium")
+    with col_a:
+        st.markdown(c1, unsafe_allow_html=True)
+        st.markdown("<div style='height:10px'></div>", unsafe_allow_html=True)
+        st.markdown(c3, unsafe_allow_html=True)
+    with col_b:
+        st.markdown(c2, unsafe_allow_html=True)
+        st.markdown("<div style='height:10px'></div>", unsafe_allow_html=True)
+        st.markdown(c4, unsafe_allow_html=True)
+    st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
+
+    # ── Rate scenario selector ─────────────────────────────────────────────
+    st.markdown("<div style='height:4px'></div>", unsafe_allow_html=True)
+    scen_col, _ = st.columns([1, 3])
+    with scen_col:
+        selected_scenario = st.selectbox(
+            "Rate Scenario",
+            options=scenario_order,
+            index=0,
+            key="p7_client_scenario_select",
+        )
+    sel_row = c_stress[c_stress["scenario"] == selected_scenario].iloc[0] if not c_stress.empty else base_row
+
+    # ── KPI metrics ────────────────────────────────────────────────────────
+    _score_delta = f"{sel_row['macro_risk_score'] - base_row['macro_risk_score']:+.0f} vs Base" if selected_scenario != "Base" else None
+    _pti_delta   = f"{sel_row['pti'] - base_row['pti']:+.1f}% vs Base" if selected_scenario != "Base" else None
+    _disp_delta  = f"${sel_row['disposable_income'] - base_row['disposable_income']:+,.0f} vs Base" if selected_scenario != "Base" else None
+    metric_row([
+        ("Payment-to-Income",   f"{sel_row['pti']:.1f}%",                 _pti_delta,   "inverse"),
+        ("Monthly Disposable",  f"${sel_row['disposable_income']:,.0f}",  _disp_delta,  "normal"),
+        ("Liquidity Runway",    f"{runway_months:.1f} mo",                 None,         "normal"),
+        ("Inflation Exposure",  f"{inf_pct:.0f}% of income",              None,         "inverse"),
+    ])
+
+    st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
+
+    # ── Charts ────────────────────────────────────────────────────────────
+    r1c1, r1c2 = st.columns(2, gap="medium")
+
+    with r1c1:
+        section_title("Rate Stress — Payment & Disposable Income")
+        scenario_display = c_stress_sorted[[
+            "scenario", "stressed_payment", "payment_delta", "pti", "disposable_income",
+        ]].copy()
+        scenario_display.columns = ["Scenario", "Total Pmt/mo", "Pmt Δ/mo", "PTI %", "Disposable/mo"]
+        scenario_display["Total Pmt/mo"]  = scenario_display["Total Pmt/mo"].map(lambda x: f"${x:,.0f}")
+        scenario_display["Pmt Δ/mo"]      = scenario_display["Pmt Δ/mo"].map(lambda x: f"+${x:,.0f}" if x >= 0 else f"${x:,.0f}")
+        scenario_display["PTI %"]         = scenario_display["PTI %"].map(lambda x: f"{x:.1f}%")
+        scenario_display["Disposable/mo"] = scenario_display["Disposable/mo"].map(lambda x: f"${x:,.0f}")
+        st.dataframe(scenario_display, use_container_width=True, hide_index=True, height=185)
+
+    with r1c2:
+        section_title("Monthly Payment by Scenario")
+        fig = go.Figure()
+        fig.add_trace(go.Scatter(
+            x=c_stress_sorted["scenario"],
+            y=c_stress_sorted["stressed_payment"],
+            mode="lines+markers+text",
+            line=dict(color=PRIMARY, width=2.5),
+            marker=dict(size=9),
+            text=[f"${v:,.0f}" for v in c_stress_sorted["stressed_payment"]],
+            textposition="top center",
+            textfont=dict(size=10),
+            name="Total Payment",
+        ))
+        if monthly_income > 0:
+            fig.add_hline(
+                y=monthly_income * 0.40,
+                line_dash="dash", line_color=DANGER, line_width=1.2,
+                annotation_text="40% income threshold", annotation_font_size=10,
+            )
+        fig.update_layout(yaxis_tickformat="$,.0f", xaxis_title="Scenario",
+                          yaxis_title="Monthly Payment ($)", showlegend=False)
+        st.plotly_chart(chart(fig, 260), use_container_width=True)
+
+    r2c1, r2c2 = st.columns(2, gap="medium")
+
+    with r2c1:
+        section_title("Disposable Income by Scenario")
+        disp_colors = [
+            DANGER if v < 0 else (WARNING if v < 500 else SUCCESS)
+            for v in c_stress_sorted["disposable_income"]
+        ]
+        fig = go.Figure(go.Bar(
+            x=c_stress_sorted["scenario"],
+            y=c_stress_sorted["disposable_income"],
+            marker_color=disp_colors,
+            opacity=0.85,
+            text=[f"${v:,.0f}" for v in c_stress_sorted["disposable_income"]],
+            textposition="outside",
+        ))
+        fig.add_hline(y=0, line_dash="solid", line_color=MUTED, line_width=1)
+        fig.update_layout(yaxis_tickformat="$,.0f", xaxis_title="Scenario",
+                          yaxis_title="Disposable Income ($)", showlegend=False)
+        st.plotly_chart(chart(fig, 260), use_container_width=True)
+
+    with r2c2:
+        section_title("Inflation-Sensitive Spending")
+        if inf_spend:
+            inf_df = pd.DataFrame([{"Category": k, "Amount": v} for k, v in inf_spend.items()])
+            fig = px.pie(
+                inf_df, names="Category", values="Amount",
+                hole=0.5,
+                color_discrete_sequence=[PRIMARY, "#3b82f6", SUCCESS, WARNING],
+            )
+            fig.update_traces(
+                textposition="inside", textinfo="percent+label",
+                marker=dict(line=dict(color=SURFACE, width=2)),
+            )
+            fig.update_layout(showlegend=False)
+            st.plotly_chart(chart(fig, 260), use_container_width=True)
+        else:
+            st.info("No inflation-sensitive transaction data available.")
 
 
 def render_placeholder_pillar_detail(customer, title):
@@ -3435,6 +4075,7 @@ def loan_assessment(customer, amount, loan_type, term):
     pmt       = round(amount * r / (1 - (1 + r) ** -term), 2)
     dti_after = round((customer["total_debt"] + amount) / max(customer["annual_income"], 1), 4)
     pti       = round((pmt / (customer["annual_income"] / 12)) * 100, 1)
+    pti       = round((pmt / (customer["annual_income"] / 12)) * 100, 1)
 
     system = f"""You are a senior underwriter at Scotiabank. Write a structured loan assessment report.
 The client data is provided. Use EXACTLY these numbers — do not make up values.
@@ -3492,6 +4133,194 @@ The client data is provided. Use EXACTLY these numbers — do not make up values
         return ai_chat(system, msg, max_tokens=1200)
 
 # ─────────────────────────────────────────────────────────────────────────────
+# MACRO FINANCIAL CONTEXT  — live BoC Valet API + StatCan fallback
+# ─────────────────────────────────────────────────────────────────────────────
+
+import urllib.request as _urllib_req
+
+# Fallback values (used if API is unreachable)
+_MACRO_FALLBACK = {
+    "boc_policy_rate":   2.75,
+    "prime_rate":        4.95,
+    "cpi_yoy":           2.3,
+    "unemployment_rate": 6.8,
+    "hpi_yoy":          -3.2,
+    "gdp_growth_yoy":    1.1,
+    "snapshot_date":     "June 2026 (fallback)",
+    "data_source":       "hardcoded fallback",
+}
+
+# BoC Valet series codes
+_BOC_SERIES = {
+    "boc_policy_rate":   "V39079",    # Overnight rate target
+    "prime_rate":        "V122514",   # Prime business loan rate
+    "cpi_yoy":           "V41690914", # CPI All-items YoY
+    "unemployment_rate": "V2062815",  # Unemployment rate (SA)
+}
+
+
+@st.cache_data(ttl=3600)   # refresh every hour
+def _fetch_macro_context():
+    """Pull latest macro indicators from BoC Valet API. Falls back to hardcoded values on error."""
+    result = dict(_MACRO_FALLBACK)
+    fetched = []
+    errors  = []
+
+    for key, series in _BOC_SERIES.items():
+        # CPI series returns index values, not YoY% — need to calculate manually
+        if key == "cpi_yoy":
+            url = f"https://www.bankofcanada.ca/valet/observations/{series}/json?recent=13"
+        else:
+            url = f"https://www.bankofcanada.ca/valet/observations/{series}/json?recent=1"
+        try:
+            with _urllib_req.urlopen(url, timeout=6) as r:
+                data = json.loads(r.read().decode())
+                obs  = data["observations"]
+                if key == "cpi_yoy" and len(obs) >= 13:
+                    # Calculate YoY from index: (latest / 12-months-ago - 1) * 100
+                    latest    = float(obs[-1][series]["v"])
+                    year_ago  = float(obs[0][series]["v"])
+                    val       = round((latest / year_ago - 1) * 100, 2)
+                else:
+                    val = float(obs[-1][series]["v"])
+                result[key] = round(val, 4)
+                fetched.append(key)
+        except Exception as e:
+            errors.append(f"{key}: {e}")
+
+    # HPI and GDP are not on Valet; keep fallback values
+    if fetched:
+        from datetime import date as _date
+        result["snapshot_date"] = _date.today().strftime("%B %Y") + " (live)"
+        result["data_source"]   = f"BoC Valet API — {len(fetched)}/{len(_BOC_SERIES)} series live"
+    else:
+        result["data_source"] = "BoC Valet API unreachable — using fallback"
+
+    result["fetch_errors"] = errors
+    result["stress_scenarios"] = {
+        "Base":     0.0,
+        "+25 bps":  0.25,
+        "+50 bps":  0.50,
+        "+100 bps": 1.00,
+    }
+    return result
+
+
+MACRO_CONTEXT = _fetch_macro_context()
+
+# Loan types that are rate-sensitive (variable or tracker)
+VARIABLE_RATE_LOAN_TYPES = {"Mortgage", "Line of Credit"}
+
+
+def compute_macro_stress(customers_list):
+    """
+    For each customer compute stress metrics under each rate scenario.
+    Returns a DataFrame with one row per (customer × scenario).
+    """
+    records = []
+    for c in customers_list:
+        base_income       = float(c.get("annual_income", 0) or 0)
+        monthly_income    = base_income / 12 if base_income > 0 else 1
+
+        active_loans = [l for l in c.get("loans", []) if l.get("status") == "Active"]
+
+        # Identify variable-rate loans and their balances
+        variable_loans = [
+            l for l in active_loans
+            if l.get("type") in VARIABLE_RATE_LOAN_TYPES
+        ]
+        fixed_loans = [
+            l for l in active_loans
+            if l.get("type") not in VARIABLE_RATE_LOAN_TYPES
+        ]
+
+        base_var_payment  = sum(float(l.get("monthly_payment", 0) or 0) for l in variable_loans)
+        base_fix_payment  = sum(float(l.get("monthly_payment", 0) or 0) for l in fixed_loans)
+        base_total_payment = base_var_payment + base_fix_payment
+
+        # Inflation-sensitive spending from transactions
+        inflation_cats = {"Groceries", "Utilities", "Rent/Mortgage", "Transport"}
+        txns = c.get("transactions", [])
+        inflation_spend_monthly = abs(sum(
+            float(t.get("amount", 0) or 0)
+            for t in txns
+            if t.get("category") in inflation_cats and float(t.get("amount", 0) or 0) < 0
+        ))
+
+        for scenario_name, rate_delta in MACRO_CONTEXT["stress_scenarios"].items():
+            # Variable rate loans: approximate payment increase
+            # Use simple approximation: each 100bps on outstanding balance ≈ +0.0083/mo per $1
+            var_balance = sum(float(l.get("amount", 0) or 0) * 0.6 for l in variable_loans)  # ~60% remaining
+            stressed_var_payment = base_var_payment + (var_balance * (rate_delta / 100) / 12)
+            stressed_total_payment = stressed_var_payment + base_fix_payment
+
+            stressed_dti = (float(c.get("total_debt", 0) or 0)) / max(base_income, 1)
+            pti = (stressed_total_payment / monthly_income) * 100  # payment-to-income %
+
+            # Inflation adjustment: CPI stress on spending
+            inflation_stressed_spend = inflation_spend_monthly * (1 + (MACRO_CONTEXT["cpi_yoy"] + rate_delta * 0.5) / 100)
+            disposable = monthly_income - stressed_total_payment - inflation_stressed_spend
+
+            # Macro Risk Score (0-100, higher = more stressed)
+            score_components = []
+            # DTI contribution (max 30 pts)
+            score_components.append(min(30, stressed_dti * 15))
+            # PTI contribution (max 25 pts)
+            score_components.append(min(25, pti * 0.4))
+            # Inflation sensitivity (max 20 pts)
+            inflation_ratio = inflation_spend_monthly / monthly_income if monthly_income > 0 else 0
+            score_components.append(min(20, inflation_ratio * 40))
+            # Employment penalty (max 15 pts)
+            emp_penalty = {"Unemployed": 15, "Part-Time": 8, "Self-Employed": 5, "Full-Time": 0, "Retired": 3}.get(
+                c.get("employment_status", "Full-Time"), 5
+            )
+            score_components.append(emp_penalty + min(5, rate_delta * 3))
+            # Credit buffer (subtract up to 10 pts for high credit score)
+            credit_score = float(c.get("credit_score", 650) or 650)
+            score_components.append(-max(0, (credit_score - 650) / 200 * 10))
+
+            macro_risk_score = max(0, min(100, sum(score_components)))
+
+            # Determine tier shift
+            original_tier = c.get("risk_tier", "Medium")
+            if macro_risk_score >= 68:
+                stressed_tier = "High"
+            elif macro_risk_score >= 42:
+                stressed_tier = "Medium"
+            else:
+                stressed_tier = "Low"
+
+            records.append({
+                "id":                   c["id"],
+                "name":                 c["name"],
+                "scenario":             scenario_name,
+                "rate_delta_bps":       int(rate_delta * 100),
+                "original_tier":        original_tier,
+                "stressed_tier":        stressed_tier,
+                "tier_upgraded":        stressed_tier != original_tier,
+                "stressed_payment":     round(stressed_total_payment, 2),
+                "payment_delta":        round(stressed_total_payment - base_total_payment, 2),
+                "pti":                  round(pti, 1),
+                "stressed_dti":         round(stressed_dti, 4),
+                "disposable_income":    round(disposable, 2),
+                "inflation_spend":      round(inflation_stressed_spend, 2),
+                "macro_risk_score":     round(macro_risk_score, 1),
+                "annual_income":        base_income,
+                "credit_score":         credit_score,
+                "employment_status":    c.get("employment_status", "Unknown"),
+                "variable_loan_count":  len(variable_loans),
+                "total_debt":           float(c.get("total_debt", 0) or 0),
+            })
+
+    return pd.DataFrame(records)
+
+
+@st.cache_data
+def get_stress_df():
+    return compute_macro_stress(customers)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # CHART THEME
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -3546,12 +4375,13 @@ if view == "Portfolio Overview":
         f"Scotiabank lending book · {len(df)} clients",
     )
 
-    m1, m2, m3, m4, m5 = st.columns(5)
-    m1.metric("Total Clients",     f"{len(df):,}")
-    m2.metric("Avg Credit Score",  f"{int(df.credit_score.mean()):,}")
-    m3.metric("Loan Exposure",     f"${df.total_debt.sum()/1e6:.1f}M")
-    m4.metric("High-Risk Clients", f"{len(df[df.risk_tier=='High'])} ({len(df[df.risk_tier=='High'])/len(df):.0%})")
-    m5.metric("Total Deposits",    f"${(df.checking+df.savings).sum()/1e6:.1f}M")
+    metric_row([
+        ("Total Clients",     f"{len(df):,}"),
+        ("Avg Credit Score",  f"{int(df.credit_score.mean()):,}"),
+        ("Loan Exposure",     f"${df.total_debt.sum()/1e6:.1f}M"),
+        ("High-Risk Clients", f"{len(df[df.risk_tier=='High'])} ({len(df[df.risk_tier=='High'])/len(df):.0%})"),
+        ("Total Deposits",    f"${(df.checking+df.savings).sum()/1e6:.1f}M"),
+    ])
 
     st.markdown("<div style='height:6px'></div>", unsafe_allow_html=True)
 
@@ -3617,6 +4447,180 @@ if view == "Portfolio Overview":
 
     # ── CLIENT DIRECTORY ─────────────────────────────────────────────────────
     st.markdown("<div style='height:12px'></div>", unsafe_allow_html=True)
+    # ── TODAY'S PRIORITY QUEUE ────────────────────────────────────────────────
+    section_title("🎯 Today's Client Priority Queue")
+
+    @st.cache_data
+    def compute_priority_queue(customers_list):
+        """Score every client and return a ranked priority DataFrame."""
+        from datetime import date as _date
+        today = _date.today()
+        sdf   = get_stress_df()
+        base  = sdf[sdf["scenario"] == "Base"].set_index("id")
+
+        rows = []
+        for c in customers_list:
+            cid     = c["id"]
+            b       = base.loc[cid] if cid in base.index else None
+
+            # ── Signal scores (0-100 each, weighted sum → triage_score) ──────
+            s = {}
+
+            # 1. Missed payments (weight 30)
+            missed = sum(int(l.get("missed_payments", 0) or 0) for l in c.get("loans", []) if l.get("status") == "Active")
+            s["missed"] = min(30, missed * 10)
+
+            # 2. DTI (weight 20)
+            dti = float(c.get("debt_to_income_ratio", 0) or 0)
+            s["dti"] = min(20, max(0, (dti - 0.35) / 0.65 * 20)) if dti > 0.35 else 0
+
+            # 3. Credit score risk (weight 15)
+            cs = int(c.get("credit_score", 700) or 700)
+            s["credit"] = min(15, max(0, (670 - cs) / 370 * 15)) if cs < 670 else 0
+
+            # 4. Rate stress — +50bps payment delta (weight 15)
+            row_50 = sdf[(sdf["id"] == cid) & (sdf["scenario"] == "+50 bps")]
+            base_row = sdf[(sdf["id"] == cid) & (sdf["scenario"] == "Base")]
+            if not row_50.empty and not base_row.empty:
+                delta = float(row_50.iloc[0]["stressed_payment"]) - float(base_row.iloc[0]["stressed_payment"])
+                s["rate"] = min(15, delta / 500 * 15)
+            else:
+                s["rate"] = 0
+
+            # 5. Mortgage renewing ≤12mo (weight 15)
+            active_loans = [l for l in c.get("loans", []) if l.get("status") == "Active"]
+            renewing = False
+            renewal_str = ""
+            for l in active_loans:
+                if l.get("type") == "Mortgage":
+                    try:
+                        end_dt = _date.fromisoformat(str(l["end_date"])[:10])
+                        days   = (end_dt - today).days
+                        if 0 < days <= 365:
+                            renewing = True
+                            renewal_str = f"{int(days/30)}mo"
+                    except Exception:
+                        pass
+            s["renewal"] = 15 if renewing else 0
+
+            # 6. Liquidity runway < 3mo (weight 10)
+            liquid   = float(c.get("checking_balance", 0) or 0) + float(c.get("savings_balance", 0) or 0)
+            base_pmt = float(base_row.iloc[0]["stressed_payment"]) if not base_row.empty else 1
+            runway   = liquid / base_pmt if base_pmt > 0 else 99
+            s["liquidity"] = 10 if runway < 3 else (5 if runway < 6 else 0)
+
+            triage_score = sum(s.values())
+
+            # Priority tier
+            if triage_score >= 35:
+                tier, icon = "High", "🔴"
+            elif triage_score >= 15:
+                tier, icon = "Medium", "🟡"
+            else:
+                tier, icon = "Low", "🟢"
+
+            # Top reason
+            top_signal = max(s, key=s.get)
+            reason_map = {
+                "missed":    f"Missed payments ({missed})",
+                "dti":       f"High DTI ({dti:.0%})",
+                "credit":    f"Low credit score ({cs})",
+                "rate":      f"Rate sensitive (+${delta:.0f}/mo at +50bps)" if "delta" in dir() else "Rate sensitive",
+                "renewal":   f"Mortgage renewing ({renewal_str})",
+                "liquidity": f"Low liquidity ({runway:.1f}mo runway)",
+            }
+            top_reason = reason_map.get(top_signal, "—") if s[top_signal] > 0 else "No urgent signals"
+
+            rows.append({
+                "id":           cid,
+                "name":         c["name"],
+                "tier":         tier,
+                "icon":         icon,
+                "triage_score": round(triage_score, 1),
+                "top_reason":   top_reason,
+                "dti":          f"{dti:.0%}",
+                "credit_score": cs,
+                "missed":       missed,
+                "renewal":      renewal_str if renewing else "—",
+                "employment":   c.get("employment_status", ""),
+            })
+
+        return pd.DataFrame(rows).sort_values("triage_score", ascending=False).reset_index(drop=True)
+
+    pq_df = compute_priority_queue(customers)
+
+    # Summary bar
+    n_high   = (pq_df["tier"] == "High").sum()
+    n_medium = (pq_df["tier"] == "Medium").sum()
+    n_low    = (pq_df["tier"] == "Low").sum()
+    st.markdown(
+        f"<div style='display:flex;gap:12px;margin-bottom:1rem'>"
+        f"<div style='background:{DANGER}12;border:1px solid {DANGER}30;border-radius:10px;"
+        f"padding:0.6rem 1.2rem;text-align:center'>"
+        f"<div style='font-size:1.4rem;font-weight:800;color:{DANGER}'>{n_high}</div>"
+        f"<div style='font-size:0.65rem;text-transform:uppercase;color:{MUTED};font-weight:600'>🔴 Follow Up</div></div>"
+        f"<div style='background:{WARNING}12;border:1px solid {WARNING}30;border-radius:10px;"
+        f"padding:0.6rem 1.2rem;text-align:center'>"
+        f"<div style='font-size:1.4rem;font-weight:800;color:{WARNING}'>{n_medium}</div>"
+        f"<div style='font-size:0.65rem;text-transform:uppercase;color:{MUTED};font-weight:600'>🟡 Monitor</div></div>"
+        f"<div style='background:{SUCCESS}12;border:1px solid {SUCCESS}30;border-radius:10px;"
+        f"padding:0.6rem 1.2rem;text-align:center'>"
+        f"<div style='font-size:1.4rem;font-weight:800;color:{SUCCESS}'>{n_low}</div>"
+        f"<div style='font-size:0.65rem;text-transform:uppercase;color:{MUTED};font-weight:600'>🟢 No Action</div></div>"
+        f"<div style='flex:1;background:{SURFACE};border:1px solid {BORDER};border-radius:10px;"
+        f"padding:0.6rem 1.2rem;display:flex;align-items:center'>"
+        f"<span style='font-size:0.82rem;color:{MUTED}'>"
+        f"Ranked by macro stress signals — missed payments, DTI, credit score, rate sensitivity, mortgage renewal, liquidity</span>"
+        f"</div></div>",
+        unsafe_allow_html=True,
+    )
+
+    # Filter to show
+    pq_filter_col, _ = st.columns([1, 3])
+    with pq_filter_col:
+        pq_tier_filter = st.selectbox(
+            "Show",
+            ["🔴 High Priority Only", "🔴🟡 High + Medium", "All Clients"],
+            index=1,
+            key="pq_tier_filter",
+            label_visibility="collapsed",
+        )
+
+    if pq_tier_filter == "🔴 High Priority Only":
+        pq_show = pq_df[pq_df["tier"] == "High"]
+    elif pq_tier_filter == "🔴🟡 High + Medium":
+        pq_show = pq_df[pq_df["tier"].isin(["High", "Medium"])]
+    else:
+        pq_show = pq_df
+
+    display_pq = pq_show[["icon", "name", "triage_score", "top_reason",
+                            "credit_score", "dti", "missed", "renewal", "employment"]].copy()
+    display_pq.columns = ["", "Name", "Score", "Top Signal",
+                           "Credit", "DTI", "Missed Pmts", "Renewal", "Employment"]
+
+    selection = st.dataframe(
+        display_pq,
+        use_container_width=True,
+        hide_index=True,
+        height=360,
+        on_select="rerun",
+        selection_mode="single-row",
+    )
+
+    # Navigate to selected client's Macro Stress
+    selected_rows = selection.selection.rows if hasattr(selection, "selection") else []
+    if selected_rows:
+        selected_idx = selected_rows[0]
+        selected_id  = pq_show.iloc[selected_idx]["id"]
+        st.session_state["selected_customer_id"] = selected_id
+        st.session_state["current_page"] = "Client Profile"
+        st.session_state["active_client_tab"] = "6 Pillars"
+        st.session_state["selected_pillar"] = "macro-financial"
+        st.rerun()
+
+    st.markdown("<div style='height:16px'></div>", unsafe_allow_html=True)
+
+    # ── CLIENT DIRECTORY ──────────────────────────────────────────────────────
     section_title("Client Directory")
 
     ALL_EMP = sorted(df.employment.unique().tolist())
@@ -3655,56 +4659,58 @@ if view == "Portfolio Overview":
         unsafe_allow_html=True,
     )
 
-    # Client card grid
-    def client_card(row):
-        rc          = RISK_COLORS[row.risk_tier]
-        rbg         = RISK_BG[row.risk_tier]
-        score_pct   = max(0, min(100, (row.credit_score - 300) / 550 * 100))
-        score_color = SUCCESS if row.credit_score >= 720 else (WARNING if row.credit_score >= 650 else DANGER)
-        dti_color   = SUCCESS if row.dti < 0.35 else (WARNING if row.dti < 0.50 else DANGER)
-        initials    = "".join(n[0] for n in str(row["name"]).split()[:2]).upper()
-        bk          = f"<span style='font-size:0.58rem;color:{DANGER};font-weight:700'>BK</span>" if row.bankruptcy else ""
-        # Build card as a list of joined strings — no triple-quotes, no leading spaces that trigger markdown code blocks
-        parts = [
-            f"<div style='background:{SURFACE};border:1px solid {BORDER};border-radius:16px;padding:1.1rem 1.15rem 0.95rem;box-shadow:0 1px 2px rgba(0,0,0,0.04),0 4px 14px rgba(0,0,0,0.03)'>",
-            f"<div style='display:flex;align-items:center;gap:9px;margin-bottom:11px'>",
-            f"<div style='width:38px;height:38px;border-radius:11px;background:{rc}18;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:0.88rem;font-weight:800;color:{rc}'>{initials}</div>",
-            f"<div style='min-width:0;flex-grow:1'>",
-            f"<div style='font-weight:700;font-size:0.875rem;color:{DARK};white-space:nowrap;overflow:hidden;text-overflow:ellipsis'>{row['name']}</div>",
-            f"<div style='font-size:0.66rem;color:{MUTED};margin-top:1px'>{row['id']} · Age {row['age']}</div>",
-            f"</div>{bk}</div>",
-            f"<div style='margin-bottom:11px'>",
-            f"<div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:4px'>",
-            f"<span style='font-size:0.58rem;color:{MUTED};text-transform:uppercase;letter-spacing:0.07em;font-weight:600'>Credit Score</span>",
-            f"<span style='font-size:0.78rem;font-weight:800;color:{score_color}'>{int(row.credit_score)}</span>",
-            f"</div>",
-            f"<div style='height:5px;background:{BG};border-radius:5px;overflow:hidden'>",
-            f"<div style='height:100%;width:{score_pct:.1f}%;background:linear-gradient(90deg,{score_color}99,{score_color});border-radius:5px'></div>",
-            f"</div></div>",
-            f"<div style='display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-bottom:11px'>",
-            f"<div style='background:{BG};border-radius:9px;padding:6px 8px'><div style='font-size:0.55rem;color:{MUTED};text-transform:uppercase;letter-spacing:0.06em;font-weight:600'>Income</div><div style='font-size:0.82rem;font-weight:700;color:{DARK};margin-top:1px'>${row.annual_income/1000:.0f}k</div></div>",
-            f"<div style='background:{BG};border-radius:9px;padding:6px 8px'><div style='font-size:0.55rem;color:{MUTED};text-transform:uppercase;letter-spacing:0.06em;font-weight:600'>DTI</div><div style='font-size:0.82rem;font-weight:700;color:{dti_color};margin-top:1px'>{row.dti:.0%}</div></div>",
-            f"<div style='background:{BG};border-radius:9px;padding:6px 8px'><div style='font-size:0.55rem;color:{MUTED};text-transform:uppercase;letter-spacing:0.06em;font-weight:600'>Assets</div><div style='font-size:0.82rem;font-weight:700;color:{DARK};margin-top:1px'>${row.total_assets/1000:.0f}k</div></div>",
-            f"<div style='background:{BG};border-radius:9px;padding:6px 8px'><div style='font-size:0.55rem;color:{MUTED};text-transform:uppercase;letter-spacing:0.06em;font-weight:600'>Loans</div><div style='font-size:0.82rem;font-weight:700;color:{DARK};margin-top:1px'>{int(row.active_loans)} active</div></div>",
-            f"</div>",
-            f"<div style='display:flex;justify-content:space-between;align-items:center;padding-top:9px;border-top:1px solid {BORDER}'>",
-            f"<span style='background:{rbg};color:{rc};font-size:0.6rem;font-weight:700;padding:2px 9px;border-radius:20px;border:1px solid {rc}28;letter-spacing:0.06em;text-transform:uppercase'>{row.risk_tier} Risk</span>",
-            f"<span style='font-size:0.66rem;color:{MUTED}'>{row.employment}</span>",
-            f"</div></div>",
-        ]
-        return "".join(parts)
-
+    # Client directory — sortable table
     if filtered.empty:
         st.markdown(
             f"<div style='text-align:center;padding:3rem;color:{MUTED}'>No clients match filters.</div>",
             unsafe_allow_html=True,
         )
     else:
-        cards_html = "".join(client_card(row) for _, row in filtered.iterrows())
-        st.markdown(
-            "<div style='display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:12px'>"
-            + cards_html + "</div>",
-            unsafe_allow_html=True,
+        sort_col, sort_dir_col, _ = st.columns([2, 1, 4])
+        with sort_col:
+            sort_by = st.selectbox(
+                "Sort by",
+                ["Name", "Credit Score", "Annual Income", "Total Debt", "DTI", "Risk Score", "Age"],
+                index=1,
+                key="dir_sort_by",
+                label_visibility="collapsed",
+            )
+        with sort_dir_col:
+            sort_asc = st.selectbox(
+                "Order",
+                ["↑ Asc", "↓ Desc"],
+                index=1,
+                key="dir_sort_dir",
+                label_visibility="collapsed",
+            ) == "↑ Asc"
+
+        col_map = {
+            "Name": "name", "Credit Score": "credit_score", "Annual Income": "annual_income",
+            "Total Debt": "total_debt", "DTI": "dti", "Risk Score": "risk_score", "Age": "age",
+        }
+        display_df = filtered.sort_values(col_map[sort_by], ascending=sort_asc).reset_index(drop=True)
+
+        # Build display table
+        table_df = pd.DataFrame({
+            "ID":           display_df["id"],
+            "Name":         display_df["name"],
+            "Age":          display_df["age"],
+            "Employment":   display_df["employment"],
+            "Credit Score": display_df["credit_score"].astype(int),
+            "Income":       display_df["annual_income"].apply(lambda x: f"${x:,.0f}"),
+            "Total Debt":   display_df["total_debt"].apply(lambda x: f"${x:,.0f}"),
+            "DTI":          display_df["dti"].apply(lambda x: f"{x:.1%}"),
+            "Assets":       display_df["total_assets"].apply(lambda x: f"${x:,.0f}"),
+            "Risk Tier":    display_df["risk_tier"],
+            "Active Loans": display_df["active_loans"].astype(int),
+            "Bankruptcy":   display_df["bankruptcy"].apply(lambda x: "Yes" if x else "No"),
+        })
+
+        st.dataframe(
+            table_df,
+            use_container_width=True,
+            hide_index=True,
+            height=500,
         )
 
 
@@ -3721,13 +4727,14 @@ elif view == "Client Profile":
         badge_color=RISK_COLORS[c["risk_tier"]],
     )
 
-    m1, m2, m3, m4, m5, m6 = st.columns(6)
-    m1.metric("Credit Score",  c["credit_score"])
-    m2.metric("Annual Income", f"${c['annual_income']:,}")
-    m3.metric("Checking",      f"${c['checking_balance']:,}")
-    m4.metric("Savings",       f"${c['savings_balance']:,}")
-    m5.metric("Total Debt",    f"${c['total_debt']:,}")
-    m6.metric("DTI",           f"{c['debt_to_income_ratio']:.1%}")
+    metric_row([
+        ("Credit Score",  str(c["credit_score"])),
+        ("Annual Income", f"${c['annual_income']:,}"),
+        ("Checking",      f"${c['checking_balance']:,}"),
+        ("Savings",       f"${c['savings_balance']:,}"),
+        ("Total Debt",    f"${c['total_debt']:,}"),
+        ("DTI",           f"{c['debt_to_income_ratio']:.1%}"),
+    ])
 
     st.markdown("<div style='height:4px'></div>", unsafe_allow_html=True)
     render_client_profile_tab_nav()
@@ -4100,19 +5107,31 @@ elif view == "Client Profile":
                         ("Savings Status", usage["savings"]),
                     ],
                 ),
-                pillar_link_card_html(
-                    "Summary",
-                    "summary",
-                    "Pillar 6",
-                    "Advisor-ready synthesis of relationship, usage, and opportunity signals.",
-                    [
-                        ("Risk Tier", c["risk_tier"]),
-                        ("Primary Segment", safe_text(customer_field(c, "primary_segment"))),
-                        ("Advisor", safe_text(customer_field(c, "note_advisor_name", "advisor_name"))),
-                    ],
-                ),
             ]
 
+            # P6 — compute preview values for the card
+            _sdf = get_stress_df()
+            _cbase = _sdf[(_sdf["id"] == c["id"]) & (_sdf["scenario"] == "Base")]
+            if not _cbase.empty:
+                _p7_score = float(_cbase["macro_risk_score"].values[0])
+                _p7_vloans = int(_cbase["variable_loan_count"].values[0])
+                _p7_sens = "High" if _p7_score >= 68 else ("Medium" if _p7_score >= 42 else "Low")
+            else:
+                _p7_score, _p7_vloans, _p7_sens = 0, 0, "N/A"
+
+            overview_cards.append(
+                pillar_link_card_html(
+                    "Macro Stress",
+                    "macro-financial",
+                    "Pillar 6",
+                    "Rate stress test, inflation sensitivity, and macro risk overlay for this client.",
+                    [
+                        ("Macro Risk Score", f"{_p7_score:.0f}/100"),
+                        ("Variable Loans",   str(_p7_vloans)),
+                        ("Rate Sensitivity", _p7_sens),
+                    ],
+                )
+            )
             st.markdown(
                 "<div class='pillar-grid'>" + "".join(overview_cards) + "</div>",
                 unsafe_allow_html=True,
@@ -4127,8 +5146,8 @@ elif view == "Client Profile":
             render_financial_goal_detail(c)
         elif pillar_route == "offer":
             render_offer_detail(c)
-        elif pillar_route == "summary":
-            render_placeholder_pillar_detail(c, "Summary Detail")
+        elif pillar_route == "macro-financial":
+            render_macro_financial_detail(c)
 
 # ─────────────────────────────────────────────────────────────────────────────
 # VIEW 3 — LOAN ASSESSMENT
