@@ -4054,9 +4054,22 @@ def vault_query(question: str):
     # Phase 1 — name match (e.g. "what is Nicole's credit score")
     name_hits = vault.search_by_name(question)
 
-    if name_hits:
-        # Specific person found — use only name hits, no keyword noise
-        top_tokens = name_hits[:5]
+    if len(name_hits) > 1:
+        # Multiple people share that name — ask the advisor to clarify
+        names = []
+        for t in name_hits[:5]:
+            record = vault.resolve(t)
+            display = str(record.get("customer_name") or t) if record else t
+            names.append(f"- {display}")
+        names_list = "\n".join(names)
+        return (
+            f"I found {len(name_hits)} clients matching that name. Which one did you mean?\n\n{names_list}",
+            [],
+        )
+
+    if len(name_hits) == 1:
+        # Exactly one person — answer directly
+        top_tokens = name_hits
         context = _build_agent_context(top_tokens)
         system = (
             "You are a senior banking advisor at Scotiabank. "
