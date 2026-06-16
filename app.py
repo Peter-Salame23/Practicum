@@ -22,6 +22,7 @@ import vault
 
 load_dotenv("data/.env")
 OPENROUTER_KEY = os.environ.get("OpenrouterApiKey", "").strip().strip("'\"")
+OFFER_JSON_PATH = os.environ.get("OfferJsonPath", "data/offer.json").strip().strip("'\"")
 # MMA data sources — prefers xlsx (Cathy's format), falls back to csv (Peter's format)
 _VAULT_XLSX     = "MMA - Practicum Synthetic Data.xlsx"
 _VAULT_CSV      = "MMA - Practicum Synthetic Data(Synethic_Data).csv"
@@ -567,6 +568,113 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 
 # ─────────────────────────────────────────────────────────────────────────────
+# MMA RELATIONSHIP DATA MODEL  (segments / products / spend / channels)
+# ─────────────────────────────────────────────────────────────────────────────
+
+SEGMENT_ORDER = ["Primacy", "Near Primacy", "Non-Primacy"]
+SEGMENT_COLORS = {
+    "Primacy":      PRIMARY,
+    "Near Primacy": WARNING,
+    "Non-Primacy":  MUTED,
+}
+SEGMENT_BG = {
+    "Primacy":      "rgba(236,17,26,0.12)",
+    "Near Primacy": "rgba(245,158,11,0.12)",
+    "Non-Primacy":  "rgba(148,163,184,0.16)",
+}
+
+PRODUCT_FLAGS = [
+    ("has_active_chequing",                                   "Chequing"),
+    ("has_active_savings",                                    "Savings"),
+    ("has_active_registered_retirement_savings_account",      "RRSP"),
+    ("has_active_registered_first_home_savings_account",      "FHSA"),
+    ("has_active_registered_education_savings_account",       "RESP"),
+    ("has_smart_investor_plan",                               "Smart Investor"),
+    ("has_advice_plus_plan",                                  "Advice+"),
+    ("has_pac_last_30days",                                   "PAC"),
+]
+
+SPEND_FIELDS = [
+    ("net_grocery_amt_30days",            "Groceries"),
+    ("net_dining_amt_30days",             "Dining"),
+    ("net_online_amt_30days",             "Online"),
+    ("net_recurring_payment_amt_30days",  "Recurring"),
+    ("net_fuel_amt_30days",               "Fuel"),
+    ("net_travel_amt_30days",             "Travel"),
+    ("net_telecom_utilities_amt_30days",  "Telecom / Utilities"),
+    ("net_health_amt_30days",             "Health"),
+    ("net_entertainment_amt_30days",      "Entertainment"),
+    ("net_daily_transit_amt_30days",      "Transit"),
+    ("net_automotive_amt_30days",         "Automotive"),
+    ("net_department_store_amt_30days",   "Department Store"),
+]
+
+CHANNEL_FIELDS = [
+    ("net_chip_pin_amt_30days",       "Chip & PIN"),
+    ("net_paywave_amt_30days",        "Tap / PayWave"),
+    ("net_online_amt_30days",         "Online / e-Comm"),
+    ("net_apple_total_amt_30days",    "Apple Pay"),
+    ("net_google_total_amt_30days",   "Google Pay"),
+    ("net_samsung_total_amt_30days",  "Samsung Pay"),
+]
+
+GIC_BUCKET_ORDER = ["≤ 30 days", "31–90 days", "91–365 days", "> 1 year", "No GIC"]
+GIC_BUCKET_COLORS = {
+    "≤ 30 days":   DANGER,
+    "31–90 days":  WARNING,
+    "91–365 days": "#3b82f6",
+    "> 1 year":    SUCCESS,
+    "No GIC":      "#cbd5e1",
+}
+
+
+def flag_is_true(value):
+    if isinstance(value, bool):
+        return value
+    if value is None:
+        return False
+    if isinstance(value, (int, float)):
+        return value == 1
+    return str(value).strip().lower() in {"true", "yes", "y", "1", "active", "open"}
+
+
+def active_product_count(customer):
+    return sum(1 for key, _ in PRODUCT_FLAGS if flag_is_true(customer.get(key)))
+
+
+def amt(customer, key, default=0.0):
+    value = customer.get(key)
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def gic_balance(customer):
+    return max(
+        amt(customer, "gic_market_value_cad_gic"),
+        amt(customer, "gic_account_amount_cad_gic"),
+        amt(customer, "gic_face_value_cad_gic"),
+    )
+
+
+def gic_maturity_bucket(days):
+    try:
+        days = float(days)
+    except (TypeError, ValueError):
+        return "No GIC"
+    if days <= 0:
+        return "No GIC"
+    if days <= 30:
+        return "≤ 30 days"
+    if days <= 90:
+        return "31–90 days"
+    if days <= 365:
+        return "91–365 days"
+    return "> 1 year"
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # DATA
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -894,23 +1002,296 @@ def has_investment_product(customer):
     return customer.get("investment_balance", 0) > 0
 
 
+def normalize_offer_signal(signal):
+    return re.sub(r"[^a-z0-9]+", "_", str(signal).strip().lower()).strip("_")
+
+
+def infer_client_signals(customer):
+    signals = {}
+
+    def add(signal, reason):
+        normalized = normalize_offer_signal(signal)
+        if normalized and normalized not in signals:
+            signals[normalized] = reason
+
+    age = safe_number(customer_field(customer, "age"), None)
+    checking_balance = safe_number(customer_field(customer, "checking_balance", "balance_cad_1month_bb_d2d", "balance_cad_lmonth_bb_d2d"), 0.0) or 0.0
+    savings_balance = safe_number(customer_field(customer, "savings_balance", "balance_cad_1month_hisa"), 0.0) or 0.0
+    avg_balance = safe_number(customer_field(customer, "avg_balance_cad_1month_bb_d2d", "avg_balance_cad_lmonth_bb_d2d"), None)
+    monthly_fee = (safe_number(customer_field(customer, "monthly_fee_cad_bb_d2d"), 0.0) or 0.0) + (safe_number(customer_field(customer, "total_fee_cad_1month_hisa"), 0.0) or 0.0)
+    goal_count = int(safe_number(customer_field(customer, "financial_goal_count"), 0) or 0)
+    digital_flag = parse_bool(customer_field(customer, "has_digital_engagement_last_30days", "digital_engagement_flag_30days"))
+    active_savings = parse_bool(customer_field(customer, "has_active_savings"))
+    active_chequing = parse_bool(customer_field(customer, "has_active_chequing"))
+    combined_deposits = max(checking_balance, 0) + max(savings_balance, 0)
+
+    paywave_amt = abs(safe_number(customer_field(customer, "net_paywave_amt_30days"), 0.0) or 0.0)
+    online_amt = abs(safe_number(customer_field(customer, "net_online_amt_30days"), 0.0) or 0.0)
+    chip_pin_amt = abs(safe_number(customer_field(customer, "net_chip_pin_amt_30days"), 0.0) or 0.0)
+    magnetic_amt = abs(safe_number(customer_field(customer, "net_magnetic_stripe_amt_30days"), 0.0) or 0.0)
+    grocery_amt = abs(safe_number(customer_field(customer, "net_grocery_amt_30days"), 0.0) or 0.0)
+    dining_amt = abs(safe_number(customer_field(customer, "net_dining_amt_30days"), 0.0) or 0.0)
+    fuel_amt = abs(safe_number(customer_field(customer, "net_fuel_amt_30days"), 0.0) or 0.0)
+    transit_amt = abs(safe_number(customer_field(customer, "net_daily_transit_amt_30days"), 0.0) or 0.0)
+    travel_amt = abs(safe_number(customer_field(customer, "net_travel_amt_30days"), 0.0) or 0.0)
+    recurring_amt = abs(safe_number(customer_field(customer, "net_recurring_payment_amt_30days"), 0.0) or 0.0)
+    foreign_amt = abs(safe_number(customer_field(customer, "net_foreign_amt_30days", "transaction_amount_gic"), 0.0) or 0.0)
+    apple_pay_amt = abs(safe_number(customer_field(customer, "net_apple_pay_amt_30days", "net_apple_total_amt_30days"), 0.0) or 0.0)
+    google_pay_amt = abs(safe_number(customer_field(customer, "net_google_total_amt_30days"), 0.0) or 0.0)
+    samsung_pay_amt = abs(safe_number(customer_field(customer, "net_samsung_total_amt_30days"), 0.0) or 0.0)
+    total_internal_flow = abs(safe_number(customer_field(customer, "total_internal_amount_cad_dda", "total_internal_amount_cad_bb"), 0.0) or 0.0)
+
+    debit_usage = paywave_amt + chip_pin_amt + magnetic_amt
+    digital_payment_usage = online_amt + apple_pay_amt + google_pay_amt + samsung_pay_amt + paywave_amt
+    activity_score = debit_usage + digital_payment_usage + grocery_amt + dining_amt + fuel_amt + transit_amt + recurring_amt
+
+    if age is not None and age <= 23:
+        add("age_under_23", f"Client age is {int(age)}, which fits youth/student-style eligibility signals.")
+    if age is not None and age <= 30:
+        add("young_client", f"Client age is {int(age)}, which supports youth-oriented or early-stage banking offers.")
+    if age is not None and age >= 60:
+        add("age_60_plus", f"Client age is {int(age)}, which may be relevant for senior account benefits.")
+
+    if activity_score < 350:
+        add("low_transaction_volume", f"Recent payment activity is light at about {format_currency_value(activity_score)} over 30 days.")
+        add("basic_banking_needs", "Recent transaction activity appears relatively simple and low volume.")
+    elif activity_score < 1200:
+        add("moderate_transaction_volume", f"Recent payment activity is moderate at about {format_currency_value(activity_score)} over 30 days.")
+    else:
+        add("high_transaction_volume", f"Recent payment activity is elevated at about {format_currency_value(activity_score)} over 30 days.")
+
+    if debit_usage <= 100:
+        add("limited_monthly_debit_activity", f"Debit-style spend is limited at about {format_currency_value(debit_usage)} over 30 days.")
+    if debit_usage > 250:
+        add("uses_debit_card_regularly", f"Debit-style spend is active at about {format_currency_value(debit_usage)} over 30 days.")
+    if debit_usage > 600:
+        add("frequent_debit_card_usage", f"Debit card usage is high at about {format_currency_value(debit_usage)} over 30 days.")
+        add("frequent_debit_usage", f"Debit activity is elevated at about {format_currency_value(debit_usage)} over 30 days.")
+
+    if digital_payment_usage > 250:
+        add("digital_banking_user", "Digital or card-not-present payment activity is visible in the last 30 days.")
+        add("uses_online_banking", "Online or wallet-based payment activity is visible in the last 30 days.")
+    if digital_flag is True:
+        add("digital_banking_user", "Digital engagement was active in the last 30 days.")
+    if digital_payment_usage > 500:
+        add("high_digital_payment_usage", f"Digital payment activity is elevated at about {format_currency_value(digital_payment_usage)} over 30 days.")
+    if apple_pay_amt + google_pay_amt + samsung_pay_amt > 100:
+        add("mobile_app_user", "Mobile wallet activity suggests active mobile banking behaviour.")
+        add("uses_mobile_banking", "Mobile wallet usage suggests comfort with mobile channels.")
+
+    if monthly_fee > 0:
+        add("cost_sensitive_client", f"Recent account-related fees total about {format_currency_value(monthly_fee)}.")
+        add("fee_charged_recently", f"Recent account-related fees total about {format_currency_value(monthly_fee)}.")
+        add("monthly_account_fee_charged", f"Monthly account or related fees were charged recently ({format_currency_value(monthly_fee)}).")
+    if monthly_fee >= 10:
+        add("monthly_transaction_fees_detected", f"Fee activity appears meaningful at about {format_currency_value(monthly_fee)}.")
+
+    if avg_balance is not None and checking_balance > 0:
+        if abs(avg_balance - checking_balance) / max(checking_balance, 1) <= 0.2:
+            add("stable_monthly_balance", f"Chequing balances have been relatively stable around {format_currency_value(avg_balance)}.")
+    if checking_balance >= 3000:
+        add("balance_above_3000", f"Chequing balance is above $3,000 at {format_currency_value(checking_balance)}.")
+    if combined_deposits >= 5000:
+        add("deposit_balance_over_5k", f"Combined deposit balances are above $5,000 at {format_currency_value(combined_deposits)}.")
+    if combined_deposits < 500:
+        add("low_deposit_balance", f"Combined deposit balances are low at {format_currency_value(combined_deposits)}.")
+
+    if active_savings is False:
+        add("no_active_savings_account", "No active savings account is detected for this client.")
+        add("no_savings_account", "No active savings account is detected.")
+    elif active_savings is True:
+        add("has_savings_account", "Client has an active savings account.")
+
+    if active_chequing is False:
+        add("no_active_chequing", "No active chequing account is detected.")
+    elif active_chequing is True:
+        add("has_chequing_account", "Client has an active chequing account.")
+
+    has_rrsp = parse_bool(customer_field(customer, "has_active_registered_retirement_savings_account"))
+    has_fhsa = parse_bool(customer_field(customer, "has_active_registered_first_home_savings_account"))
+    has_resp = parse_bool(customer_field(customer, "has_active_registered_education_savings_account"))
+    has_smart = parse_bool(customer_field(customer, "has_smart_investor_plan"))
+    has_advice = parse_bool(customer_field(customer, "has_advice_plus_plan"))
+
+    if has_rrsp is True:
+        add("has_rrsp", "Client holds an active RRSP.")
+        add("has_registered_account", "Client has at least one registered account.")
+    else:
+        add("no_rrsp", "No active RRSP is detected.")
+    if has_fhsa is True:
+        add("has_fhsa", "Client holds an active FHSA.")
+        add("first_home_buyer", "FHSA presence suggests the client may be saving toward a first home purchase.")
+    if has_resp is True:
+        add("has_resp", "Client holds an active RESP.")
+        add("has_dependents_or_education_goal", "RESP presence suggests the client may have dependents or an education savings goal.")
+    if has_smart is True:
+        add("has_smart_investor_plan", "Client has a Smart Investor Plan.")
+        add("investment_focused", "Client uses an investment-oriented product.")
+    if has_advice is True:
+        add("has_advice_plus_plan", "Client has an Advice+ Plan.")
+
+    if goal_count > 0:
+        add("has_financial_goals", f"Client has {goal_count} financial goal(s) recorded.")
+    if goal_count >= 2:
+        add("multiple_financial_goals", f"Client has {goal_count} financial goals, suggesting active financial planning.")
+
+    primacy = infer_primacy_flag(customer)
+    steps_away = infer_primacy_steps_away(customer)
+    if primacy is True:
+        add("primacy_client", "Client meets the primacy criteria — deepest relationship tier.")
+    elif steps_away == 1:
+        add("near_primacy_one_step", "Client is one step away from primacy — a high-priority engagement opportunity.")
+        add("near_primacy", "Client is close to achieving primacy status.")
+    elif steps_away == 2:
+        add("near_primacy", "Client is within two steps of primacy.")
+    else:
+        add("non_primacy", "Client has not yet reached primacy status.")
+
+    if grocery_amt > 200:
+        add("grocery_spender", f"Grocery spend is notable at about {format_currency_value(grocery_amt)} over 30 days.")
+    if dining_amt > 150:
+        add("dining_spender", f"Dining spend is notable at about {format_currency_value(dining_amt)} over 30 days.")
+    if fuel_amt > 100:
+        add("fuel_spender", f"Fuel spend is notable at about {format_currency_value(fuel_amt)} over 30 days.")
+    if travel_amt > 100:
+        add("travel_spender", f"Travel spend is notable at about {format_currency_value(travel_amt)} over 30 days.")
+        add("traveller", f"Travel-category spend suggests the client may travel regularly.")
+    if transit_amt > 50:
+        add("transit_user", f"Transit spend is notable at about {format_currency_value(transit_amt)} over 30 days.")
+    if foreign_amt > 50:
+        add("foreign_currency_activity", f"Foreign currency activity is detected at about {format_currency_value(foreign_amt)} over 30 days.")
+        add("international_transactions", "Foreign-currency activity suggests potential international travel or purchases.")
+    if recurring_amt > 200:
+        add("recurring_payments_active", f"Recurring payments are active at about {format_currency_value(recurring_amt)} over 30 days.")
+
+    pac_flag = parse_bool(customer_field(customer, "has_pac_last_30days"))
+    if pac_flag is True:
+        add("has_pac", "Client has a Pre-Authorized Contribution active in the last 30 days.")
+        add("regular_saver", "PAC activity suggests a habit of regular saving or investing.")
+    else:
+        add("no_pac", "No Pre-Authorized Contribution was detected in the last 30 days.")
+
+    gic_bal = gic_balance(customer)
+    gic_days = safe_number(customer_field(customer, "gic_days_to_maturity_gic"), None)
+    if gic_bal > 0:
+        add("has_gic", f"Client holds a GIC with a balance of about {format_currency_value(gic_bal)}.")
+        add("has_term_investment", "GIC presence suggests the client has some term-based investing.")
+    else:
+        add("no_gic", "No active GIC balance is detected for this client.")
+    if gic_days is not None and 0 < gic_days <= 90:
+        add("gic_maturing_soon", f"Client's GIC matures in approximately {int(gic_days)} days — a renewal or reinvestment conversation may be timely.")
+        add("gic_renewal_opportunity", f"GIC matures in about {int(gic_days)} days — potential reinvestment discussion.")
+
+    if total_internal_flow > 1000:
+        add("internal_fund_transfers", f"Internal fund transfer activity is detectable at about {format_currency_value(total_internal_flow)} over 30 days.")
+
+    return signals
+
+
+def get_recommended_offers(customer, top_n=5):
+    offer_catalog, catalog_warning = load_offer_catalog()
+    inferred_signals = infer_client_signals(customer)
+    inferred_keys = set(inferred_signals.keys())
+    scored_offers = []
+
+    for offer in offer_catalog:
+        matched_signals = [signal for signal in offer.get("normalized_client_signals", []) if signal in inferred_keys]
+        if not matched_signals:
+            continue
+        scored_offers.append(
+            {
+                **offer,
+                "match_score": len(matched_signals),
+                "matched_signals": matched_signals,
+                "matched_reasons": [inferred_signals[signal] for signal in matched_signals],
+            }
+        )
+
+    scored_offers.sort(
+        key=lambda offer: (
+            -offer["match_score"],
+            safe_text(offer.get("product_category"), ""),
+            safe_text(offer.get("product_name"), ""),
+        )
+    )
+
+    if scored_offers:
+        return scored_offers[:top_n], catalog_warning, inferred_signals
+
+    if not offer_catalog:
+        return [], catalog_warning, inferred_signals
+
+    fallback_categories = []
+    if parse_bool(customer_field(customer, "has_active_savings")) is False:
+        fallback_categories.extend(["savings", "savings_tool"])
+    if safe_number(customer_field(customer, "gic_market_value_cad_gic"), 0.0):
+        fallback_categories.append("gic_bundle")
+    if parse_bool(customer_field(customer, "has_digital_engagement_last_30days", "digital_engagement_flag_30days")) is True:
+        fallback_categories.append("digital_banking")
+    if safe_number(customer_field(customer, "net_foreign_amt_30days"), 0.0):
+        fallback_categories.extend(["foreign_currency_account", "international_payments"])
+    fallback_categories.extend(["chequing", "chequing_package", "banking_package"])
+
+    fallback_offers = []
+    used_offer_ids = set()
+    for category in fallback_categories:
+        for offer in offer_catalog:
+            if offer.get("benefit_id") in used_offer_ids:
+                continue
+            if safe_text(offer.get("product_category"), "").lower() == category.lower():
+                fallback_offers.append(
+                    {
+                        **offer,
+                        "match_score": 0,
+                        "matched_signals": [],
+                        "matched_reasons": [
+                            "No direct signal match was detected, so this offer is shown as a general benefit based on the client's broader profile."
+                        ],
+                    }
+                )
+                used_offer_ids.add(offer.get("benefit_id"))
+                break
+        if len(fallback_offers) >= top_n:
+            break
+
+    if not fallback_offers:
+        fallback_offers = [
+            {
+                **offer,
+                "match_score": 0,
+                "matched_signals": [],
+                "matched_reasons": [
+                    "No direct signal match was detected, so this offer is shown as a general benefit based on the client's broader profile."
+                ],
+            }
+            for offer in offer_catalog[:top_n]
+        ]
+
+    return fallback_offers[:top_n], catalog_warning, inferred_signals
+
+
 def build_offer_suggestions(customer):
+    matched_offers, _, _ = get_recommended_offers(customer, top_n=3)
+    if matched_offers:
+        suggestions = []
+        for offer in matched_offers:
+            reason = offer["matched_reasons"][0] if offer.get("matched_reasons") else "General profile fit."
+            suggestions.append(
+                f"{safe_text(offer.get('product_name'))}: {reason}"
+            )
+        return suggestions
+    # Fall back to simple logic if no catalog-based offers found
     offers = []
-    missing_steps = safe_text(customer_field(customer, "missing_primacy_steps"), default="").lower()
-    if "payroll" in missing_steps or "direct deposit" in missing_steps:
-        offers.append("Set up payroll or direct deposit to close a primacy gap.")
-
-    usage = infer_account_usage(customer)
-    if usage["active_savings_bool"] is False:
-        offers.append("Open or reactivate a savings account to improve deposit depth.")
-
-    if not has_investment_product(customer):
-        offers.append("Start a GIC or mutual fund conversation to expand investment product usage.")
-
-    primacy_steps = infer_primacy_steps_away(customer)
+    primacy_steps = safe_text(infer_primacy_steps_away(customer))
+    if not infer_primacy_flag(customer):
+        if not parse_bool(customer_field(customer, "has_direct_deposit", "direct_deposit_flag")):
+            offers.append("Set up payroll or direct deposit to close a primacy gap.")
+        if not parse_bool(customer_field(customer, "has_active_savings")):
+            offers.append("Open or reactivate a savings account to improve deposit depth.")
+        if not has_investment_product(customer):
+            offers.append("Start a GIC or mutual fund conversation to expand investment product usage.")
     if primacy_steps not in {"0", "Not available"} and not offers:
         offers.append("Review remaining primacy requirements and build a tailored activation plan.")
-
     if not offers:
         offers.append("No immediate offer gaps detected; focus on retention and next-best-product review.")
     return offers
@@ -1013,6 +1394,7 @@ PILLAR_DEF_MAP = {pillar["slug"]: pillar for pillar in PILLAR_DEFS}
 CLIENT_PROFILE_TABS = ["Overview", "Transactions", "Loans", "Analytics", "6 Pillars"]
 CURRENT_PAGE_KEY = "current_page"
 MAIN_NAV_WIDGET_KEY = "main_nav_widget"
+SELECTED_CUSTOMER_WIDGET_KEY = "selected_customer_widget"
 VIEW_OPTIONS = [
     "📊   Portfolio",
     "👤   Client Profile",
@@ -1047,6 +1429,12 @@ def clear_pillar_query_param():
 def on_main_nav_change():
     selected_label = st.session_state.get(MAIN_NAV_WIDGET_KEY, VIEW_OPTIONS[0])
     st.session_state[CURRENT_PAGE_KEY] = VIEW_MAP[selected_label]
+
+
+def on_selected_customer_change():
+    selected_customer_id = st.session_state.get(SELECTED_CUSTOMER_WIDGET_KEY)
+    if selected_customer_id:
+        st.session_state["selected_customer_id"] = selected_customer_id
 
 
 def ensure_navigation_state():
@@ -1373,6 +1761,89 @@ def format_display_value(value):
     if value is None:
         return "Not available"
     return str(value)
+
+
+@st.cache_data
+def load_offer_catalog():
+    if not os.path.exists(OFFER_JSON_PATH):
+        return [], f"Offer catalog not found at `{OFFER_JSON_PATH}`."
+    try:
+        with open(OFFER_JSON_PATH) as f:
+            raw_data = json.load(f)
+    except Exception as exc:
+        return [], f"Offer catalog could not be loaded from `{OFFER_JSON_PATH}`: {exc}"
+
+    if not isinstance(raw_data, list):
+        return [], f"Offer catalog at `{OFFER_JSON_PATH}` must be a JSON array."
+
+    catalog = []
+    for record in raw_data:
+        if not isinstance(record, dict):
+            continue
+        raw_signals = record.get("client_signal", [])
+        if isinstance(raw_signals, str):
+            raw_signals = [raw_signals]
+        normalized_signals = [
+            re.sub(r"[^a-z0-9]+", "_", str(signal).strip().lower()).strip("_")
+            for signal in raw_signals
+            if not is_missing(signal)
+        ]
+        catalog.append(
+            {
+                **record,
+                "client_signal": raw_signals,
+                "normalized_client_signals": [signal for signal in normalized_signals if signal],
+            }
+        )
+    return catalog, None
+
+
+def customer_id_value(customer):
+    return str(customer.get("id") or customer.get("customer_id") or "")
+
+
+def customer_name_value(customer):
+    return customer.get("name") or customer.get("customer_name") or "Unknown Client"
+
+
+def get_selected_customer(customers, selected_customer_id):
+    selected_customer_id = str(selected_customer_id or "")
+    return next(
+        (
+            customer for customer in customers
+            if customer_id_value(customer) == selected_customer_id
+        ),
+        None,
+    )
+
+
+def build_customer_context(selected_customer):
+    if not selected_customer:
+        return {}
+    return {
+        "customer_id": selected_customer.get("id") or selected_customer.get("customer_id"),
+        "name": selected_customer.get("name") or selected_customer.get("customer_name"),
+        "age": selected_customer.get("age"),
+        "annual_income": selected_customer.get("annual_income"),
+        "monthly_expenses": selected_customer.get("monthly_expenses"),
+        "checking_balance": selected_customer.get("checking_balance"),
+        "savings_balance": selected_customer.get("savings_balance"),
+        "investment_balance": selected_customer.get("investment_balance"),
+        "total_debt": selected_customer.get("total_debt"),
+        "debt_to_income_ratio": selected_customer.get("debt_to_income_ratio"),
+        "payment_to_income_ratio": selected_customer.get("payment_to_income_ratio"),
+        "credit_score": selected_customer.get("credit_score"),
+        "risk_tier": selected_customer.get("risk_tier"),
+        "risk_score": selected_customer.get("risk_score"),
+        "employment_status": selected_customer.get("employment_status"),
+        "job_title": selected_customer.get("job_title"),
+        "years_at_employer": selected_customer.get("years_at_employer"),
+        "num_late_payments": selected_customer.get("num_late_payments"),
+        "bankruptcy_history": selected_customer.get("bankruptcy_history"),
+        "total_assets": selected_customer.get("total_assets"),
+        "member_since": selected_customer.get("member_since"),
+        "loans": selected_customer.get("loans", []),
+    }
 
 
 def flow_value(customer, key, default=None):
@@ -2633,6 +3104,76 @@ def render_financial_goal_detail(customer):
     )
 
 
+def render_offer_detail(customer):
+    if st.button("← Back to 6 Pillars Overview", key="back_to_pillars_offer", type="secondary"):
+        set_selected_pillar("overview")
+        st.rerun()
+
+    st.markdown(pillar_detail_header_html("Offer", customer), unsafe_allow_html=True)
+
+    matched_offers, catalog_warning, inferred_signals = get_recommended_offers(customer, top_n=4)
+    if catalog_warning:
+        st.warning(catalog_warning)
+
+    if not matched_offers:
+        st.info("No clear offer was detected for this client from the current offer catalog.")
+        return
+
+    if max(offer.get("match_score", 0) for offer in matched_offers) < 2:
+        st.info("No strong signal match was detected, so the offers below are broader relevant benefits for advisor review.")
+
+    st.markdown(
+        pillar_card_html(
+            "Offer Matching Summary",
+            rows=[
+                ("Detected Client Signals", f"{len(inferred_signals):,}"),
+                ("Recommended Offers Shown", f"{len(matched_offers):,}"),
+                ("Top Match Score", str(max(offer.get("match_score", 0) for offer in matched_offers))),
+            ],
+            body_html=(
+                f"<div style='padding-top:10px;font-size:0.84rem;color:{DARK};line-height:1.65'>"
+                f"The offer recommendations below are matched from <code>{escape(OFFER_JSON_PATH)}</code> using inferred client signals from the selected customer's profile, balances, activity, goals, and product indicators."
+                f"</div>"
+            ),
+        ),
+        unsafe_allow_html=True,
+    )
+    st.markdown("<div style='height:12px'></div>", unsafe_allow_html=True)
+
+    card_cols = st.columns(2, gap="medium")
+    for idx, offer in enumerate(matched_offers):
+        reasons = offer.get("matched_reasons") or [
+            "No direct signal match was detected; this benefit is shown as a broader relevant offer for review."
+        ]
+        reason_items = "".join(
+            f"<li style='margin-bottom:6px'>{escape(reason)}</li>"
+            for reason in reasons[:4]
+        )
+        body_html = (
+            f"<div style='font-size:0.84rem;color:{DARK};line-height:1.65'>"
+            f"<div style='font-weight:700;margin-bottom:4px'>Customer Benefit</div>"
+            f"<div style='margin-bottom:12px'>{escape(safe_text(offer.get('customer_benefit')))}</div>"
+            f"<div style='font-weight:700;margin-bottom:4px'>Why This Client May Be Relevant</div>"
+            f"<ul style='margin:0 0 12px 18px;padding:0'>{reason_items}</ul>"
+            f"<div style='font-weight:700;margin-bottom:4px'>Advisor / Model Use</div>"
+            f"<div style='margin-bottom:12px'>{escape(safe_text(offer.get('model_use')))}</div>"
+            f"<div style='font-size:0.76rem;color:{MUTED};padding-top:10px;border-top:1px solid {BORDER}'>"
+            f"Advisor should verify current eligibility, fees, rates, and suitability before presenting to the client."
+            f"</div></div>"
+        )
+        rows = [
+            ("Product Category", safe_text(offer.get("product_category"))),
+            ("Match Score", str(offer.get("match_score", 0))),
+            ("Source Document", safe_text(offer.get("source_doc"))),
+            ("Source Page", safe_text(offer.get("source_page"))),
+        ]
+        with card_cols[idx % 2]:
+            st.markdown(
+                pillar_card_html(safe_text(offer.get("product_name")), rows=rows, body_html=body_html),
+                unsafe_allow_html=True,
+            )
+
+
 def render_client_profile_tab_nav():
     active_tab = st.session_state.get("active_client_tab", "Overview")
     cols = st.columns(len(CLIENT_PROFILE_TABS), gap="small")
@@ -3585,7 +4126,7 @@ elif view == "Client Profile":
         elif pillar_route == "client-goal":
             render_financial_goal_detail(c)
         elif pillar_route == "offer":
-            render_placeholder_pillar_detail(c, "Offer Detail")
+            render_offer_detail(c)
         elif pillar_route == "summary":
             render_placeholder_pillar_detail(c, "Summary Detail")
 
@@ -4063,9 +4604,6 @@ elif view == "AI Assistant":
     st.divider()
 
     def render_customer_card(token: str) -> None:
-        """Resolve a vault token and render a customer card using native Streamlit
-        components — no raw HTML injection so special characters never break rendering.
-        Cross-references cust_index for derived fields (credit score, risk tier)."""
         record = vault.resolve(token)
         if record is None:
             return
@@ -4081,7 +4619,6 @@ elif view == "AI Assistant":
         income  = record.get("annual_income")
         income_str = f"${float(income):,.0f}" if income else "—"
 
-        # Pull derived fields from customers.json via cust_index
         cust_id    = str(record.get("customer_id") or "")
         derived    = cust_index.get(cust_id, {})
         credit     = derived.get("credit_score")
@@ -4122,7 +4659,6 @@ elif view == "AI Assistant":
             st.caption(f"**Goal:** {goal} ({goal_st})  ·  **Missing:** {missing}  ·  **Products:** {', '.join(products) or 'none'}")
 
     def render_vault_section(tokens: list[str]) -> None:
-        """Render vault cards OUTSIDE the chat bubble so page styles apply correctly."""
         if not tokens:
             return
         st.markdown(
@@ -4136,13 +4672,13 @@ elif view == "AI Assistant":
                 render_customer_card(t)
 
     def replay_message(msg: dict) -> None:
-        """Re-render a single turn from history (cards outside bubble, text inside)."""
         if msg["role"] == "user":
             with st.chat_message("user", avatar="👤"):
                 st.markdown(msg["content"])
         else:
             tokens = msg.get("vault_tokens", [])
-            render_vault_section(tokens)
+            if tokens:
+                render_vault_section(tokens)
             with st.chat_message("assistant", avatar="🤖"):
                 if tokens:
                     st.markdown(
@@ -4153,16 +4689,12 @@ elif view == "AI Assistant":
                 st.markdown(msg["content"])
 
     def handle_question(question: str) -> None:
-        """Run vault query, display results, append to history."""
         st.session_state.chat.append({"role": "user", "content": question})
         with st.chat_message("user", avatar="👤"):
             st.markdown(question)
 
         answer, tokens = vault_query(question)
-
-        # Cards rendered directly in the page — NOT inside the chat bubble
         render_vault_section(tokens)
-
         with st.chat_message("assistant", avatar="🤖"):
             if tokens:
                 st.markdown(
@@ -4171,7 +4703,6 @@ elif view == "AI Assistant":
                     unsafe_allow_html=True,
                 )
             st.markdown(answer)
-
         st.session_state.chat.append({
             "role": "assistant", "content": answer, "vault_tokens": tokens
         })
