@@ -444,6 +444,15 @@ div[data-testid="stPlotlyChart"] .plot-container {{
   box-shadow: 0 2px 10px rgba(0,0,0,0.06) !important;
   background: {SURFACE} !important;
 }}
+.stChatInput textarea {{
+  background: {SURFACE} !important;
+  color: {DARK} !important;
+  caret-color: {DARK} !important;
+}}
+.stChatInput textarea::placeholder {{
+  color: {MUTED} !important;
+  opacity: 1 !important;
+}}
 
 /* ── FORCE INTER — exclude Material Icons spans so chat avatars render ── */
 input, select, textarea, button, label, p,
@@ -5367,14 +5376,8 @@ elif view == "Loan Assessment":
                 </div>""",
                 unsafe_allow_html=True,
             )
-            st.markdown(
-                f"<div style='background:{SURFACE};border:1px solid {BORDER};border-radius:16px;"
-                f"padding:1.25rem 1.35rem;box-shadow:0 1px 3px rgba(0,0,0,0.04);"
-                f"min-height:260px;width:100%;max-width:100%;box-sizing:border-box;overflow:hidden'>",
-                unsafe_allow_html=True,
-            )
-            st.markdown(text)
-            st.markdown("</div>", unsafe_allow_html=True)
+            with st.container():
+                st.markdown(text)
         else:
             st.markdown(
                 f"""<div style='background:{SURFACE};border:2px dashed {BORDER};border-radius:18px;
@@ -5656,26 +5659,52 @@ elif view == "AI Assistant":
             ("has_smart_investor_plan",  "Smart Investor"),
         ] if record.get(field)]
 
-        seg_icon = {"Primacy": "🟢", "Near Primacy": "🟡", "Non-Primacy": "🔴"}.get(seg, "⚪")
-        dig_tag  = " · 📱 Digital" if digital else ""
+        seg_color = {"Primacy": SUCCESS, "Near Primacy": WARNING, "Non-Primacy": DANGER}.get(seg, MUTED)
+        seg_bg    = {"Primacy": f"rgba(16,185,129,0.10)", "Near Primacy": f"rgba(245,158,11,0.10)", "Non-Primacy": f"rgba(239,68,68,0.10)"}.get(seg, f"rgba(100,116,139,0.10)")
+        risk_c    = {"Low": SUCCESS, "Medium": WARNING, "High": DANGER}.get(risk_tier, MUTED)
+        dig_badge = (f"<span style='font-size:0.62rem;font-weight:600;color:#3b82f6;"
+                     f"background:rgba(59,130,246,0.10);border:1px solid rgba(59,130,246,0.20);"
+                     f"border-radius:20px;padding:2px 8px;margin-left:6px'>📱 Digital</span>"
+                     if digital else "")
+        prod_str  = ", ".join(products) if products else "None"
 
-        with st.container(border=True):
-            h_left, h_right = st.columns([3, 1])
-            h_left.markdown(f"**{name}**{dig_tag}")
-            h_right.markdown(
-                f"<div style='text-align:right;font-size:0.8rem;font-weight:700'>"
-                f"{seg_icon} {seg}</div>",
-                unsafe_allow_html=True,
-            )
+        def _kv(label, val, color=DARK):
+            return (f"<div style='flex:1;min-width:90px;background:{BG};border-radius:10px;"
+                    f"padding:0.55rem 0.75rem'>"
+                    f"<div style='font-size:0.58rem;font-weight:700;text-transform:uppercase;"
+                    f"letter-spacing:0.07em;color:{MUTED};margin-bottom:3px'>{label}</div>"
+                    f"<div style='font-size:0.92rem;font-weight:700;color:{color}'>{val}</div>"
+                    f"</div>")
 
-            c1, c2, c3, c4, c5 = st.columns(5)
-            c1.metric("Income", income_str)
-            c2.metric("Credit Score", credit_str)
-            c3.metric("Risk", risk_tier)
-            c4.metric("Steps to Primacy", steps)
-            c5.metric("Advisor", advisor)
+        st.markdown(
+            f"<div style='background:{SURFACE};border:1px solid {BORDER};border-radius:14px;"
+            f"padding:1rem 1.1rem;margin-bottom:0.6rem;box-shadow:0 1px 3px rgba(0,0,0,0.04)'>"
 
-            st.caption(f"**Goal:** {goal} ({goal_st})  ·  **Missing:** {missing}  ·  **Products:** {', '.join(products) or 'none'}")
+            # Header row
+            f"<div style='display:flex;align-items:center;justify-content:space-between;margin-bottom:0.7rem'>"
+            f"<div style='font-size:0.95rem;font-weight:700;color:{DARK}'>{escape(name)}{dig_badge}</div>"
+            f"<span style='font-size:0.65rem;font-weight:700;padding:3px 10px;border-radius:20px;"
+            f"background:{seg_bg};color:{seg_color};border:1px solid {seg_color}30'>{seg}</span>"
+            f"</div>"
+
+            # Metrics row
+            f"<div style='display:flex;gap:6px;flex-wrap:wrap;margin-bottom:0.65rem'>"
+            f"{_kv('Income', income_str)}"
+            f"{_kv('Credit Score', credit_str)}"
+            f"{_kv('Risk', risk_tier, risk_c)}"
+            f"{_kv('Steps to Primacy', str(steps))}"
+            f"{_kv('Advisor', escape(advisor))}"
+            f"</div>"
+
+            # Footer row
+            f"<div style='font-size:0.72rem;color:{MUTED};border-top:1px solid {BORDER};padding-top:0.5rem'>"
+            f"<span style='color:{DARK};font-weight:600'>Goal:</span> {escape(goal)} ({escape(goal_st)}) &nbsp;·&nbsp; "
+            f"<span style='color:{DARK};font-weight:600'>Missing:</span> {escape(missing)} &nbsp;·&nbsp; "
+            f"<span style='color:{DARK};font-weight:600'>Products:</span> {escape(prod_str)}"
+            f"</div>"
+            f"</div>",
+            unsafe_allow_html=True,
+        )
 
     def render_vault_section(tokens: list[str]) -> None:
         if not tokens:
