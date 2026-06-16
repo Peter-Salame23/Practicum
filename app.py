@@ -1209,6 +1209,7 @@ def infer_client_signals(customer):
     travel_amt = abs(safe_number(customer_field(customer, "net_travel_amt_30days"), 0.0) or 0.0)
     recurring_amt = abs(safe_number(customer_field(customer, "net_recurring_payment_amt_30days"), 0.0) or 0.0)
     foreign_amt = abs(safe_number(customer_field(customer, "net_foreign_amt_30days", "transaction_amount_gic"), 0.0) or 0.0)
+    foreign_cash_advance_amt = abs(safe_number(customer_field(customer, "foreign_cash_advance_amt_30days"), 0.0) or 0.0)
     apple_pay_amt = abs(safe_number(customer_field(customer, "net_apple_pay_amt_30days", "net_apple_total_amt_30days"), 0.0) or 0.0)
     google_pay_amt = abs(safe_number(customer_field(customer, "net_google_total_amt_30days"), 0.0) or 0.0)
     samsung_pay_amt = abs(safe_number(customer_field(customer, "net_samsung_total_amt_30days"), 0.0) or 0.0)
@@ -1264,99 +1265,87 @@ def infer_client_signals(customer):
             add("stable_monthly_balance", f"Chequing balances have been relatively stable around {format_currency_value(avg_balance)}.")
     if checking_balance >= 3000:
         add("balance_above_3000", f"Chequing balance is above $3,000 at {format_currency_value(checking_balance)}.")
-    if combined_deposits >= 5000:
-        add("deposit_balance_over_5k", f"Combined deposit balances are above $5,000 at {format_currency_value(combined_deposits)}.")
-    if combined_deposits < 500:
-        add("low_deposit_balance", f"Combined deposit balances are low at {format_currency_value(combined_deposits)}.")
+    if checking_balance >= 4000:
+        add("balance_above_4000", f"Chequing balance is above $4,000 at {format_currency_value(checking_balance)}.")
+    if checking_balance >= 6000:
+        add("balance_above_6000", f"Chequing balance is above $6,000 at {format_currency_value(checking_balance)}.")
+    if combined_deposits >= 10000:
+        add("high_deposit_balance", f"Combined deposit balances are healthy at {format_currency_value(combined_deposits)}.")
+    if combined_deposits >= 30000:
+        add("combined_balance_above_30000", f"Combined chequing and savings balances are above $30,000 at {format_currency_value(combined_deposits)}.")
 
+    if active_chequing is True:
+        add("eligible_chequing_or_savings_account", "Client has an active chequing relationship.")
+    if active_savings is True:
+        add("uses_savings_account", "Client has an active savings relationship.")
     if active_savings is False:
-        add("no_active_savings_account", "No active savings account is detected for this client.")
-        add("no_savings_account", "No active savings account is detected.")
-    elif active_savings is True:
-        add("has_savings_account", "Client has an active savings account.")
+        add("no_existing_savings_account", "Client does not appear to have an active savings account.")
+        add("needs_basic_savings_account", "Client may benefit from adding a basic savings relationship.")
+    if savings_balance < 3000:
+        add("low_savings_balance", f"Savings balance is relatively low at {format_currency_value(savings_balance)}.")
+    if savings_balance >= 10000:
+        add("high_savings_balance", f"Savings balance is elevated at {format_currency_value(savings_balance)}.")
+        add("idle_cash_balance", f"Savings balance suggests idle cash of about {format_currency_value(savings_balance)}.")
+    if savings_balance >= 25000:
+        add("large_savings_balance", f"Savings balance is large at {format_currency_value(savings_balance)}.")
 
-    if active_chequing is False:
-        add("no_active_chequing", "No active chequing account is detected.")
-    elif active_chequing is True:
-        add("has_chequing_account", "Client has an active chequing account.")
-
-    has_rrsp = parse_bool(customer_field(customer, "has_active_registered_retirement_savings_account"))
-    has_fhsa = parse_bool(customer_field(customer, "has_active_registered_first_home_savings_account"))
-    has_resp = parse_bool(customer_field(customer, "has_active_registered_education_savings_account"))
-    has_smart = parse_bool(customer_field(customer, "has_smart_investor_plan"))
-    has_advice = parse_bool(customer_field(customer, "has_advice_plus_plan"))
-
-    if has_rrsp is True:
-        add("has_rrsp", "Client holds an active RRSP.")
-        add("has_registered_account", "Client has at least one registered account.")
-    else:
-        add("no_rrsp", "No active RRSP is detected.")
-    if has_fhsa is True:
-        add("has_fhsa", "Client holds an active FHSA.")
-        add("first_home_buyer", "FHSA presence suggests the client may be saving toward a first home purchase.")
-    if has_resp is True:
-        add("has_resp", "Client holds an active RESP.")
-        add("has_dependents_or_education_goal", "RESP presence suggests the client may have dependents or an education savings goal.")
-    if has_smart is True:
-        add("has_smart_investor_plan", "Client has a Smart Investor Plan.")
-        add("investment_focused", "Client uses an investment-oriented product.")
-    if has_advice is True:
-        add("has_advice_plus_plan", "Client has an Advice+ Plan.")
+    deposit_hisa = safe_number(customer_field(customer, "deposit_amount_cad_1month_hisa"), 0.0) or 0.0
+    withdrawal_hisa = safe_number(customer_field(customer, "withdrawal_amount_cad_1month_hisa"), 0.0) or 0.0
+    if deposit_hisa > 0 and withdrawal_hisa <= deposit_hisa * 0.4:
+        add("stable_savings_balance", f"Savings deposits of {format_currency_value(deposit_hisa)} exceed withdrawals of {format_currency_value(withdrawal_hisa)}.")
+        add("low_withdrawal_frequency", "Savings withdrawals are relatively light compared with deposits.")
+    if total_internal_flow > 500:
+        add("frequent_internal_transfers", f"Internal transfers total about {format_currency_value(total_internal_flow)}.")
+        add("savings_transfer_activity", f"Internal movement suggests ongoing transfer activity of about {format_currency_value(total_internal_flow)}.")
 
     if goal_count > 0:
-        add("has_financial_goals", f"Client has {goal_count} financial goal(s) recorded.")
-    if goal_count >= 2:
-        add("multiple_financial_goals", f"Client has {goal_count} financial goals, suggesting active financial planning.")
+        add("savings_goal", f"Client has {goal_count} financial goal(s) recorded.")
+    if active_savings is False and debit_usage > 250:
+        add("needs_automatic_savings", "Client has active day-to-day spend but no active savings relationship.")
+        add("round_up_savings_opportunity", "Frequent spend activity could support an automatic round-up savings conversation.")
 
-    primacy = infer_primacy_flag(customer)
-    steps_away = infer_primacy_steps_away(customer)
-    if primacy is True:
-        add("primacy_client", "Client meets the primacy criteria — deepest relationship tier.")
-    elif steps_away == 1:
-        add("near_primacy_one_step", "Client is one step away from primacy — a high-priority engagement opportunity.")
-        add("near_primacy", "Client is close to achieving primacy status.")
-    elif steps_away == 2:
-        add("near_primacy", "Client is within two steps of primacy.")
-    else:
-        add("non_primacy", "Client has not yet reached primacy status.")
+    if travel_amt > 150:
+        add("travel_transactions", f"Travel-related spend is visible at about {format_currency_value(travel_amt)} over 30 days.")
+    if transit_amt > 75:
+        add("transit_spend", f"Transit spend is visible at about {format_currency_value(transit_amt)} over 30 days.")
+        add("commuter_client", "Transit activity suggests a commuter payment pattern.")
+    if foreign_amt > 100 or foreign_cash_advance_amt > 0:
+        add("uses_international_money_transfer", f"Foreign or cross-border activity totals about {format_currency_value(foreign_amt + foreign_cash_advance_amt)}.")
+        add("frequent_cross_border_payments", "Cross-border or foreign transaction activity is visible.")
+        add("international_client", "The client shows signs of international or foreign-currency activity.")
+    if foreign_cash_advance_amt > 0:
+        add("foreign_cash_withdrawals", f"Foreign cash advance activity is visible at about {format_currency_value(foreign_cash_advance_amt)}.")
 
-    if grocery_amt > 200:
-        add("grocery_spender", f"Grocery spend is notable at about {format_currency_value(grocery_amt)} over 30 days.")
-    if dining_amt > 150:
-        add("dining_spender", f"Dining spend is notable at about {format_currency_value(dining_amt)} over 30 days.")
-    if fuel_amt > 100:
-        add("fuel_spender", f"Fuel spend is notable at about {format_currency_value(fuel_amt)} over 30 days.")
-    if travel_amt > 100:
-        add("travel_spender", f"Travel spend is notable at about {format_currency_value(travel_amt)} over 30 days.")
-        add("traveller", f"Travel-category spend suggests the client may travel regularly.")
-    if transit_amt > 50:
-        add("transit_user", f"Transit spend is notable at about {format_currency_value(transit_amt)} over 30 days.")
-    if foreign_amt > 50:
-        add("foreign_currency_activity", f"Foreign currency activity is detected at about {format_currency_value(foreign_amt)} over 30 days.")
-        add("international_transactions", "Foreign-currency activity suggests potential international travel or purchases.")
-    if recurring_amt > 200:
-        add("recurring_payments_active", f"Recurring payments are active at about {format_currency_value(recurring_amt)} over 30 days.")
+    usd_markers = [
+        safe_text(customer_field(customer, "transaction_currency_mft"), ""),
+        safe_text(customer_field(customer, "transaction_currency_gic"), ""),
+        safe_text(customer_field(customer, "currency_gic"), ""),
+        safe_text(customer_field(customer, "product_name_gic"), ""),
+        safe_text(customer_field(customer, "product_category_gic"), ""),
+    ]
+    if any("usd" in marker.lower() for marker in usd_markers):
+        add("usd_transactions", "USD-denominated product or transaction activity is present in the client record.")
+        add("foreign_currency_need", "USD-denominated activity suggests a foreign-currency banking need.")
+        add("travel_to_us", "USD-denominated activity may indicate U.S. travel or payment needs.")
 
-    pac_flag = parse_bool(customer_field(customer, "has_pac_last_30days"))
-    if pac_flag is True:
-        add("has_pac", "Client has a Pre-Authorized Contribution active in the last 30 days.")
-        add("regular_saver", "PAC activity suggests a habit of regular saving or investing.")
-    else:
-        add("no_pac", "No Pre-Authorized Contribution was detected in the last 30 days.")
+    if has_investment_product(customer):
+        add("multi_product_client", "Client appears to hold both deposit and investment-style products.")
 
-    gic_bal = gic_balance(customer)
-    gic_days = safe_number(customer_field(customer, "gic_days_to_maturity_gic"), None)
-    if gic_bal > 0:
-        add("has_gic", f"Client holds a GIC with a balance of about {format_currency_value(gic_bal)}.")
-        add("has_term_investment", "GIC presence suggests the client has some term-based investing.")
-    else:
-        add("no_gic", "No active GIC balance is detected for this client.")
-    if gic_days is not None and 0 < gic_days <= 90:
-        add("gic_maturing_soon", f"Client's GIC matures in approximately {int(gic_days)} days — a renewal or reinvestment conversation may be timely.")
-        add("gic_renewal_opportunity", f"GIC matures in about {int(gic_days)} days — potential reinvestment discussion.")
+    gic_value = safe_number(customer_field(customer, "gic_market_value_cad_gic"), 0.0) or 0.0
+    gic_days = safe_number(customer_field(customer, "days_to_maturity_gic"), None)
+    if gic_value > 0:
+        add("gic_interest", f"Client has GIC holdings with market value around {format_currency_value(gic_value)}.")
+        add("conservative_investment_profile", "Existing GIC holdings suggest a conservative savings or investment profile.")
+    if gic_value >= 10000:
+        add("large_term_deposit_balance", f"GIC holdings are meaningful at about {format_currency_value(gic_value)}.")
+    if gic_days is not None and gic_days <= 120:
+        add("maturing_gic", f"A GIC is maturing relatively soon in about {int(gic_days)} day(s).")
 
-    if total_internal_flow > 1000:
-        add("internal_fund_transfers", f"Internal fund transfer activity is detectable at about {format_currency_value(total_internal_flow)} over 30 days.")
+    if paywave_amt + online_amt + grocery_amt + dining_amt > 900:
+        add("high_card_spend", f"Recent card-like spend is elevated at about {format_currency_value(paywave_amt + online_amt + grocery_amt + dining_amt)}.")
+        add("high_card_spend_potential", "Recent spend levels suggest potential value from card-linked package benefits.")
+    if travel_amt + grocery_amt + dining_amt > 600:
+        add("travel_or_cashback_spend_pattern", "Spend mix includes categories often linked to travel or cashback value discussions.")
 
     return signals
 
