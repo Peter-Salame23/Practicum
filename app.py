@@ -674,9 +674,9 @@ st.markdown(f"""
 
 SEGMENT_ORDER = ["Primacy", "Near Primacy", "Non-Primacy"]
 SEGMENT_COLORS = {
-    "Primacy":      PRIMARY,
-    "Near Primacy": WARNING,
-    "Non-Primacy":  MUTED,
+    "Primacy":      PRIMARY,     # deepest relationship → brand red
+    "Near Primacy": WARNING,     # within reach → amber
+    "Non-Primacy":  MUTED,       # opportunity → slate
 }
 SEGMENT_BG = {
     "Primacy":      "rgba(236,17,26,0.12)",
@@ -718,16 +718,6 @@ CHANNEL_FIELDS = [
     ("net_google_total_amt_30days",   "Google Pay"),
     ("net_samsung_total_amt_30days",  "Samsung Pay"),
 ]
-
-GIC_BUCKET_ORDER = ["≤ 30 days", "31–90 days", "91–365 days", "> 1 year", "No GIC"]
-GIC_BUCKET_COLORS = {
-    "≤ 30 days":   DANGER,
-    "31–90 days":  WARNING,
-    "91–365 days": "#3b82f6",
-    "> 1 year":    SUCCESS,
-    "No GIC":      "#cbd5e1",
-}
-
 
 def flag_is_true(value):
     if isinstance(value, bool):
@@ -773,6 +763,16 @@ def gic_maturity_bucket(days):
     if days <= 365:
         return "91–365 days"
     return "> 1 year"
+
+
+GIC_BUCKET_ORDER = ["≤ 30 days", "31–90 days", "91–365 days", "> 1 year", "No GIC"]
+GIC_BUCKET_COLORS = {
+    "≤ 30 days":   DANGER,
+    "31–90 days":  WARNING,
+    "91–365 days": "#3b82f6",
+    "> 1 year":    SUCCESS,
+    "No GIC":      "#cbd5e1",
+}
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -851,10 +851,26 @@ df = pd.DataFrame([{
     "total_debt": c["total_debt"], "risk_tier": c["risk_tier"],
     "risk_score": c["risk_score"], "employment": c["employment_status"],
     "checking": c["checking_balance"], "savings": c["savings_balance"],
+    "investments": c.get("investment_balance", 0),
     "total_assets": c["total_assets"], "dti": c["debt_to_income_ratio"],
     "bankruptcy": c["bankruptcy_history"], "member_since": c["member_since"],
     "active_loans": sum(1 for l in c["loans"] if l["status"] == "Active"),
+    # ── MMA relationship intelligence fields ────────────────────────────────
+    "segment": c.get("primary_segment", "Non-Primacy"),
+    "steps_away": c.get("primacy_steps_away"),
+    "products": active_product_count(c),
+    "digital": flag_is_true(c.get("has_digital_engagement_last_30days")),
+    "pac": flag_is_true(c.get("has_pac_last_30days")),
+    "monthly_expenses": amt(c, "monthly_expenses"),
+    "gic_days": amt(c, "days_to_maturity_gic"),
+    "fx_30d": amt(c, "net_foreign_amt_30days"),
 } for c in customers])
+
+# Normalize segment labels to the canonical three and derive relationship metrics
+df["segment"] = df["segment"].where(df["segment"].isin(SEGMENT_ORDER), "Non-Primacy")
+df["rel_balance"] = df["checking"] + df["savings"] + df["investments"]
+df["idle_months"] = np.where(df["monthly_expenses"] > 0, df["checking"] / df["monthly_expenses"], 0.0)
+df["gic_bucket"] = df["gic_days"].apply(gic_maturity_bucket)
 
 # ─────────────────────────────────────────────────────────────────────────────
 # UI HELPERS
@@ -4370,31 +4386,34 @@ PALETTE = [PRIMARY, "#3b82f6", SUCCESS, WARNING, "#8b5cf6", "#06b6d4"]
 PALETTE = [PRIMARY, "#3b82f6", SUCCESS, WARNING, "#8b5cf6", "#06b6d4"]
 
 def chart(fig, h=360):
+    # Show a legend on every chart that has more than one series, plus pie /
+    # donut charts (one trace but multiple legend-worthy categories), so legends
+    # appear consistently across the app. Single-series bars/lines/histograms
+    # are left without a one-item legend.
+    is_pie = any(getattr(t, "type", "") == "pie" for t in fig.data)
+    show_legend = len(fig.data) > 1 or is_pie
+    # Reserve extra bottom room when a legend is shown so the horizontal legend
+    # below the plot isn't clipped by the fixed chart height.
+    bottom_margin = 72 if show_legend else 28
     fig.update_layout(
         autosize=True,
         height=h,
         paper_bgcolor=SURFACE,
         plot_bgcolor=SURFACE,
         font=dict(family="Inter, -apple-system, sans-serif", size=12, color="#374151"),
-        margin=dict(l=28, r=20, t=36, b=28),
+        margin=dict(l=28, r=20, t=36, b=bottom_margin),
+        showlegend=show_legend,
         legend=dict(
             bgcolor="rgba(0,0,0,0)",
             borderwidth=0,
-            font=dict(size=10),
+            font=dict(size=10, color=DARK),
+            title=dict(font=dict(size=10, color=DARK)),
             orientation="h",
             yanchor="top",
             y=-0.16,
             xanchor="center",
             x=0.5,
         ),
-    )
-    fig.update_xaxes(
-        gridcolor="#f1f5f9", showline=False,
-        tickfont=dict(size=10, color=MUTED), zeroline=False,
-    )
-    fig.update_yaxes(
-        gridcolor="#f1f5f9", showline=False,
-        tickfont=dict(size=10, color=MUTED), zeroline=False,
     )
     fig.update_xaxes(
         gridcolor="#f1f5f9", showline=False,
@@ -4426,64 +4445,139 @@ if view == "Portfolio Overview":
 
     st.markdown("<div style='height:6px'></div>", unsafe_allow_html=True)
 
-    # Row 1
+    # ── ROW 1 — relationship deepening pipeline + cross-sell whitespace ───────
     c1, c2 = st.columns(2, gap="medium")
     with c1:
-        section_title("Risk Tier Distribution")
-        rc = df.risk_tier.value_counts().reset_index()
-        rc.columns = ["Tier", "Count"]
-        fig = px.pie(rc, names="Tier", values="Count", hole=0.55,
-                     color="Tier", color_discrete_map=RISK_COLORS)
-        fig.update_traces(
-            textposition="inside", textinfo="percent+label",
-            textfont_size=12,
-            marker=dict(line=dict(color=SURFACE, width=2.5)),
-        )
-        fig.update_layout(showlegend=False)
-        st.plotly_chart(chart(fig, 320), use_container_width=True)
-
+        section_title("Distance to Primacy")
+        st.caption("How many relationship steps each client is from full Primacy — the deepening pipeline.")
+        dp = df[df.steps_away.notna()].copy()
+        if not dp.empty:
+            dp["steps_away"] = dp["steps_away"].astype(int)
+            grp = dp.groupby(["steps_away", "segment"]).size().reset_index(name="Count")
+            grp["Steps Away"] = grp["steps_away"].map(
+                lambda s: "Primacy (0)" if s == 0 else f"{s} step{'s' if s > 1 else ''} away"
+            )
+            order = [
+                ("Primacy (0)" if s == 0 else f"{s} step{'s' if s > 1 else ''} away")
+                for s in sorted(dp["steps_away"].unique())
+            ]
+            fig = px.bar(
+                grp, x="Steps Away", y="Count", color="segment",
+                color_discrete_map=SEGMENT_COLORS,
+                category_orders={"segment": SEGMENT_ORDER, "Steps Away": order},
+                text="Count",
+            )
+            fig.update_traces(marker_line_width=0, opacity=0.9, textposition="outside")
+            fig.update_layout(barmode="stack", legend_title_text="")
+            st.plotly_chart(chart(fig, 320), use_container_width=True)
+        else:
+            st.info("No primacy-step data available.")
 
     with c2:
-        section_title("Credit Score Distribution")
-        fig = px.histogram(df, x="credit_score", nbins=28,
-                           color_discrete_sequence=[PRIMARY],
-                           labels={"credit_score": "Credit Score", "count": "Clients"})
-        fig.update_traces(marker_line_width=0, opacity=0.8)
-        fig.add_vline(x=750, line_dash="dash", line_color=SUCCESS, line_width=1.5,
-                      annotation_text="Excellent", annotation_font_size=10)
-        fig.add_vline(x=670, line_dash="dash", line_color=WARNING, line_width=1.5,
-                      annotation_text="Fair", annotation_font_size=10)
-        fig.update_traces(marker_line_width=0, opacity=0.8)
-        fig.add_vline(x=750, line_dash="dash", line_color=SUCCESS, line_width=1.5,
-                      annotation_text="Excellent", annotation_font_size=10)
-        fig.add_vline(x=670, line_dash="dash", line_color=WARNING, line_width=1.5,
-                      annotation_text="Fair", annotation_font_size=10)
-        st.plotly_chart(chart(fig, 320), use_container_width=True)
+        section_title("Product Penetration by Segment")
+        st.caption("Share of each segment holding a product. Light cells are cross-sell whitespace.")
+        rows = []
+        for seg in SEGMENT_ORDER:
+            sub = [c for c in customers if c.get("primary_segment") == seg]
+            if not sub:
+                continue
+            for key, label in PRODUCT_FLAGS:
+                pen = sum(1 for c in sub if flag_is_true(c.get(key))) / len(sub) * 100
+                rows.append({"Segment": seg, "Product": label, "Penetration": pen})
+        heat = pd.DataFrame(rows)
+        if not heat.empty:
+            pivot = (
+                heat.pivot(index="Segment", columns="Product", values="Penetration")
+                .reindex(SEGMENT_ORDER)
+                .reindex(columns=[lbl for _, lbl in PRODUCT_FLAGS])
+            )
+            fig = px.imshow(
+                pivot, text_auto=".0f", aspect="auto",
+                color_continuous_scale=["#fef2f2", "#fca5a5", PRIMARY],
+                labels=dict(color="% holding"),
+            )
+            fig.update_traces(textfont_size=10)
+            fig.update_xaxes(side="bottom", tickangle=-30)
+            fig.update_layout(coloraxis_colorbar=dict(title="%", thickness=10))
+            st.plotly_chart(chart(fig, 320), use_container_width=True)
+        else:
+            st.info("No product-holding data available.")
 
-    # Row 2
-
-    # Row 2
+    # ── ROW 2 — prioritization quadrant + maturity pipeline ───────────────────
     c3, c4 = st.columns(2, gap="medium")
     with c3:
-        section_title("Income vs Total Debt")
-        fig = px.scatter(df, x="annual_income", y="total_debt",
-                         color="risk_tier", color_discrete_map=RISK_COLORS,
-                         hover_data=["name", "credit_score"],
-                         labels={"annual_income": "Annual Income ($)",
-                                 "total_debt": "Total Debt ($)", "risk_tier": "Risk"},
-                         opacity=0.75)
-        fig.update_traces(marker=dict(size=7))
+        section_title("Risk vs Relationship Value")
+        st.caption("Bubble size = annual income. Top-left = high-value, low-risk anchors; bottom-right needs attention.")
+        fig = px.scatter(
+            df, x="risk_score", y="rel_balance", color="segment", size="annual_income",
+            color_discrete_map=SEGMENT_COLORS,
+            category_orders={"segment": SEGMENT_ORDER},
+            hover_data={"name": True, "products": True, "risk_score": ":.0f",
+                        "rel_balance": ":$,.0f", "annual_income": ":$,.0f", "segment": False},
+            labels={"risk_score": "Risk Score (0–100)", "rel_balance": "Relationship Balance ($)"},
+            size_max=24, opacity=0.78,
+        )
+        fig.update_layout(yaxis_tickformat="$,.0f", legend_title_text="")
+        fig.add_vline(x=72, line_dash="dot", line_color=SUCCESS, line_width=1)
+        fig.add_vline(x=48, line_dash="dot", line_color=WARNING, line_width=1)
         st.plotly_chart(chart(fig, 320), use_container_width=True)
 
-
     with c4:
-        section_title("Employment Status")
-        ec = df.employment.value_counts().reset_index()
-        ec.columns = ["Status", "Count"]
-        fig = px.bar(ec, x="Count", y="Status", orientation="h",
-                     color_discrete_sequence=[PRIMARY], text="Count")
-        fig.update_traces(textposition="outside", marker_line_width=0, opacity=0.85)
-        fig.update_layout(yaxis=dict(categoryorder="total ascending"))
+        section_title("GIC Maturity Pipeline")
+        st.caption("Term deposits approaching maturity are time-sensitive reinvestment conversations.")
+        gp = (
+            df.gic_bucket.value_counts()
+            .reindex(GIC_BUCKET_ORDER).fillna(0).reset_index()
+        )
+        gp.columns = ["Bucket", "Count"]
+        gp = gp[gp["Count"] > 0]
+        fig = px.bar(
+            gp, x="Bucket", y="Count", color="Bucket", text="Count",
+            color_discrete_map=GIC_BUCKET_COLORS,
+            category_orders={"Bucket": GIC_BUCKET_ORDER},
+        )
+        fig.update_traces(textposition="outside", marker_line_width=0, opacity=0.9)
+        fig.update_layout(legend_title_text="")
+        st.plotly_chart(chart(fig, 320), use_container_width=True)
+
+    # ── ROW 3 — where the book spends + credit quality by segment ─────────────
+    c5, c6 = st.columns(2, gap="medium")
+    with c5:
+        section_title("Book Spending Profile (30 days)")
+        st.caption("Aggregate card & account spend by category across the book.")
+        totals = []
+        for key, label in SPEND_FIELDS:
+            total = sum(abs(amt(c, key)) for c in customers)
+            if total > 0:
+                totals.append({"Category": label, "Spend": total})
+        sp = pd.DataFrame(totals).sort_values("Spend")
+        if not sp.empty:
+            fig = px.bar(
+                sp, x="Spend", y="Category", orientation="h", text_auto=".2s",
+                color_discrete_sequence=[PRIMARY],
+            )
+            fig.update_traces(textposition="outside", marker_line_width=0, opacity=0.88)
+            fig.update_layout(xaxis_tickprefix="$", xaxis_tickformat=",.0s")
+            st.plotly_chart(chart(fig, 320), use_container_width=True)
+        else:
+            st.info("No spend-category data available.")
+
+    with c6:
+        section_title("Credit Quality by Segment")
+        st.caption("Credit-score distribution split by relationship segment.")
+        fig = px.histogram(
+            df, x="credit_score", color="segment", nbins=26,
+            color_discrete_map=SEGMENT_COLORS,
+            category_orders={"segment": SEGMENT_ORDER},
+            barmode="overlay", opacity=0.65,
+            labels={"credit_score": "Credit Score", "count": "Clients"},
+        )
+        fig.update_traces(marker_line_width=0)
+        fig.add_vline(x=750, line_dash="dash", line_color=SUCCESS, line_width=1.2,
+                      annotation_text="Excellent", annotation_font_size=10)
+        fig.add_vline(x=670, line_dash="dash", line_color=WARNING, line_width=1.2,
+                      annotation_text="Fair", annotation_font_size=10)
+        fig.update_layout(legend_title_text="")
         st.plotly_chart(chart(fig, 320), use_container_width=True)
 
     # ── CLIENT DIRECTORY ─────────────────────────────────────────────────────
@@ -4803,23 +4897,6 @@ elif view == "Client Profile":
                 unsafe_allow_html=True,
             )
 
-            section_title("Personal & Employment")
-            rows_html = "".join([
-                kv_row("Age / Gender",     f"{c['age']} / {c['gender']}"),
-                kv_row("Email",            c["email"]),
-                kv_row("Phone",            c["phone"]),
-                kv_row("Address",          c["address"]),
-                kv_row("Employment",       f"{c['employment_status']} — {c['job_title']}"),
-                kv_row("Employer",         c["employer"]),
-                kv_row("Tenure",           f"{c['years_at_employer']} years"),
-                kv_row("Monthly Expenses", f"${c['monthly_expenses']:,}"),
-            ])
-            st.markdown(
-                f"<div style='background:{SURFACE};border:1px solid {BORDER};"
-                f"border-radius:14px;padding:1rem 1.25rem;'>{rows_html}</div>",
-                unsafe_allow_html=True,
-            )
-
         with col2:
             section_title("Account Balances")
             bal = pd.DataFrame({
@@ -4830,26 +4907,11 @@ elif view == "Client Profile":
                          text_auto="$.2s",
                          color_discrete_sequence=["#3b82f6", SUCCESS, PRIMARY])
             fig.update_traces(textposition="outside", marker_line_width=0, opacity=0.85)
-            section_title("Account Balances")
-            bal = pd.DataFrame({
-                "Account": ["Checking", "Savings", "Investments"],
-                "Balance": [c["checking_balance"], c["savings_balance"], c["investment_balance"]],
-            })
-            fig = px.bar(bal, x="Account", y="Balance", color="Account",
-                         text_auto="$.2s",
-                         color_discrete_sequence=["#3b82f6", SUCCESS, PRIMARY])
-            fig.update_traces(textposition="outside", marker_line_width=0, opacity=0.85)
-            fig.update_layout(showlegend=False, yaxis_tickformat="$,.0f")
+            fig.update_layout(yaxis_tickformat="$,.0f")
             st.plotly_chart(chart(fig, 240), use_container_width=True)
 
             section_title("Credit Risk Flags")
-
-            section_title("Credit Risk Flags")
             flags = [
-                ("Late Payments",            str(c["num_late_payments"]),           c["num_late_payments"] > 0),
-                ("Months Since Delinquency", str(c.get("months_since_last_delinquency") or "—"), False),
-                ("Open Accounts",            str(c["num_open_accounts"]),            False),
-                ("Bankruptcy",               "Yes ⚠️" if c["bankruptcy_history"] else "No ✅", c["bankruptcy_history"]),
                 ("Late Payments",            str(c["num_late_payments"]),           c["num_late_payments"] > 0),
                 ("Months Since Delinquency", str(c.get("months_since_last_delinquency") or "—"), False),
                 ("Open Accounts",            str(c["num_open_accounts"]),            False),
@@ -4917,7 +4979,6 @@ elif view == "Client Profile":
             section_title("Recent Transactions")
             disp = txn_df.head(50).copy()
             disp["Date"]   = disp["date"].dt.strftime("%Y-%m-%d")
-            disp["Date"]   = disp["date"].dt.strftime("%Y-%m-%d")
             disp["Amount"] = disp["amount"].apply(
                 lambda x: f"+${x:,.2f}" if x > 0 else f"-${abs(x):,.2f}"
             )
@@ -4935,30 +4996,8 @@ elif view == "Client Profile":
 
         if active:
             section_title(f"Active Loans ({len(active)})")
-            section_title(f"Active Loans ({len(active)})")
             for l in active:
                 st.markdown(loan_card_html(l), unsafe_allow_html=True)
-                st.markdown(loan_card_html(l), unsafe_allow_html=True)
-
-            section_title("Amortization Schedule")
-            fig = go.Figure()
-            for i, l in enumerate(active):
-                r   = l["rate"] / 100 / 12
-                s   = datetime.strptime(l["start_date"], "%Y-%m-%d")
-                e   = datetime.strptime(l["end_date"],   "%Y-%m-%d")
-                n   = int((e - s).days / 30)
-                bal = l["amount"]
-                dates, bals = [], []
-                for m in range(min(n, 360)):
-                    dates.append(s + timedelta(days=30 * m))
-                    bals.append(bal)
-                    bal = max(0, bal - (l["monthly_payment"] - bal * r))
-                fig.add_trace(go.Scatter(
-                    x=dates, y=bals, name=l["type"], mode="lines",
-                    line=dict(color=PALETTE[i % len(PALETTE)], width=2.5),
-                ))
-            fig.update_layout(yaxis_tickformat="$,.0f", xaxis_title="Date", yaxis_title="Balance")
-            st.plotly_chart(chart(fig, 320), use_container_width=True)
 
             section_title("Amortization Schedule")
             fig = go.Figure()
@@ -4981,8 +5020,6 @@ elif view == "Client Profile":
             st.plotly_chart(chart(fig, 320), use_container_width=True)
 
         if closed:
-            st.markdown("<div style='height:4px'></div>", unsafe_allow_html=True)
-            section_title(f"Closed Loans ({len(closed)})")
             st.markdown("<div style='height:4px'></div>", unsafe_allow_html=True)
             section_title(f"Closed Loans ({len(closed)})")
             for l in closed:
@@ -5008,7 +5045,6 @@ elif view == "Client Profile":
         c1, c2 = st.columns(2, gap="medium")
         with c1:
             section_title("Financial Health Radar")
-            section_title("Financial Health Radar")
             cats = ["Credit Score", "Low DTI", "Income", "Assets", "Job Tenure", "Clean Record"]
             vals = [
                 norm(c["credit_score"], 300, 850),
@@ -5020,7 +5056,7 @@ elif view == "Client Profile":
             ]
             fig = go.Figure(go.Scatterpolar(
                 r=vals + [vals[0]], theta=cats + [cats[0]],
-                fill="toself", name="",
+                fill="toself", name="Health Score",
                 fillcolor=f"rgba(236,17,26,0.12)",
                 line=dict(color=PRIMARY, width=2.5),
             ))
@@ -5031,8 +5067,10 @@ elif view == "Client Profile":
                     angularaxis=dict(tickfont=dict(size=11)),
                     bgcolor=SURFACE,
                 ),
-                showlegend=False, height=360,
-                paper_bgcolor=SURFACE, margin=dict(l=40, r=40, t=40, b=40),
+                showlegend=True, height=360,
+                legend=dict(orientation="h", yanchor="top", y=-0.08,
+                            xanchor="center", x=0.5, font=dict(size=10, color=DARK)),
+                paper_bgcolor=SURFACE, margin=dict(l=40, r=40, t=40, b=60),
             )
             st.plotly_chart(fig, use_container_width=True)
 
@@ -5045,16 +5083,9 @@ elif view == "Client Profile":
                 ("Annual Income", c["annual_income"],            int(peers.annual_income.mean()), "${:,}"),
                 ("Total Debt",    c["total_debt"],               int(peers.total_debt.mean()),    "${:,}"),
                 ("DTI Ratio",     c["debt_to_income_ratio"],     float(peers.dti.mean()),         "{:.1%}"),
-                ("Credit Score",  c["credit_score"],             int(peers.credit_score.mean()),  None),
-                ("Annual Income", c["annual_income"],            int(peers.annual_income.mean()), "${:,}"),
-                ("Total Debt",    c["total_debt"],               int(peers.total_debt.mean()),    "${:,}"),
-                ("DTI Ratio",     c["debt_to_income_ratio"],     float(peers.dti.mean()),         "{:.1%}"),
             ]
             rows = []
-            rows = []
             for label, cval, pval, fmt in compare_items:
-                cv = fmt.format(cval) if fmt else str(cval)
-                pv = fmt.format(pval) if fmt else str(pval)
                 cv = fmt.format(cval) if fmt else str(cval)
                 pv = fmt.format(pval) if fmt else str(pval)
                 pct = (cval - pval) / max(abs(pval), 1) * 100
