@@ -831,9 +831,17 @@ def _customer_to_doc(c):
     )
 
 
-@st.cache_resource
 def load_vault():
-    """Load vault from xlsx or csv, whichever exists."""
+    """Load vault from xlsx or csv, whichever exists.
+
+    Self-healing and intentionally NOT cached: it re-checks every rerun and
+    (re)loads when the vault is empty. A cached loader could memoize a no-op
+    (e.g. a run before the data file existed) and then permanently report
+    'Vault not loaded' even though the CSV is present — which breaks the AI
+    Assistant. The vault module's own dict is the process-level cache, so once
+    loaded this returns instantly."""
+    if vault.is_loaded():
+        return
     if os.path.exists(_VAULT_XLSX):
         vault.load(_VAULT_XLSX)
     elif os.path.exists(_VAULT_CSV):
@@ -3939,15 +3947,28 @@ with st.sidebar:
         if current_customer_id not in options_map.values():
             current_customer_id = options_map[labels[0]]
             st.session_state["selected_customer_id"] = current_customer_id
-        current_index = next(
-            (idx for idx, label in enumerate(labels) if options_map[label] == current_customer_id),
-            0,
+
+        # Keep the picker in sync with selected_customer_id. Streamlit honours a widget's
+        # stored value over the index= argument on reruns, so when the active client is set
+        # programmatically (e.g. a Priority Queue click), we must update the selectbox's own
+        # session_state value *before* it is instantiated — otherwise the picker keeps showing
+        # the previously selected client and immediately overwrites the navigation target.
+        desired_label = next(
+            (label for label in labels if options_map[label] == current_customer_id),
+            labels[0],
         )
+        st.session_state["selected_client_label"] = desired_label
+
+        def _sync_selected_customer():
+            picked = options_map.get(st.session_state.get("selected_client_label"))
+            if picked:
+                st.session_state["selected_customer_id"] = picked
+
         sel_label = st.selectbox(
             "client",
             labels,
-            index=current_index,
             key="selected_client_label",
+            on_change=_sync_selected_customer,
             label_visibility="collapsed",
         )
         sel_id = options_map[sel_label]
